@@ -13,11 +13,15 @@ from .tables import (
     generate_table1, generate_table2, generate_table3, generate_table4
 )
 from .filters import filter_students_for_day_period
-from .utils import get_student_key, sanitize_letter, now_kst, today_kst
-from .utils import split_days
+from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days
 
 def run_app():
     df = load_data()
+
+    print_banner = (
+        '<div class="no-print" style="background-color:#f1f3f5;padding:15px;border-radius:8px;'
+        'border-left:5px solid #868396;margin-bottom:20px;">🖨️ 인쇄: 우측 상단 ⋮ ➜ Print 선택</div>'
+    )
 
     # ✅ 배정 저장소(session_state)
     if "assignments" not in st.session_state:
@@ -32,16 +36,11 @@ def run_app():
             st.cache_data.clear()
             st.rerun()
 
-    st.markdown(
-        '<div class="no-print" style="background-color:#f1f3f5;padding:15px;border-radius:8px;'
-        'border-left:5px solid #868396;margin-bottom:20px;">🖨️ 인쇄: 우측 상단 ⋮ ➜ Print 선택</div>',
-        unsafe_allow_html=True,
-    )
-
     tab_list = st.tabs(["전체 목록", "학년별 명단", "수업시간 명단", "출석부", "학교별 명단"])
 
    # 탭 0
     with tab_list[0]:
+        st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             display_df = df[[COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS]]
             total_n = len(display_df)
@@ -129,6 +128,7 @@ def run_app():
 
     # 탭 1
     with tab_list[1]:
+        st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -144,12 +144,14 @@ def run_app():
 
     # 탭 2
     with tab_list[2]:
+        st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
             st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table2(df, m2)}</div></div>", unsafe_allow_html=True)
 
     # 탭 3
     with tab_list[3]:
+        st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             # ✅ 여기 중요: 배포(UTC)에서도 KST 기준 날짜로 기본값 고정
             d3 = st.date_input("날짜 선택", value=today_kst())
@@ -256,6 +258,7 @@ def run_app():
             st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table3(df, d3, False, day_store)}</div></div>", unsafe_allow_html=True)
     # 탭 4
     with tab_list[4]:
+        st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             m4 = st.text_input("제목(연/월)", value=now_kst().strftime("%Y.%m"), key="m4")
             st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table4(df, True, m4)}</div></div>", unsafe_allow_html=True)
