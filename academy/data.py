@@ -10,7 +10,7 @@ from .config import (
     COL_PERIOD, COL_STATUS, COL_DAYS
 )
 from .utils import norm
-
+from .filters import norm_series
 
 @st.cache_data(ttl=300, show_spinner="loading...")
 def load_data() -> pd.DataFrame:
@@ -38,9 +38,9 @@ def load_data() -> pd.DataFrame:
             st.stop()
 
         # 3) 주요 문자열 컬럼 정규화 (공백/특수공백 제거)
-        df[COL_PERIOD] = df[COL_PERIOD].astype(str).apply(norm)
+        df[COL_PERIOD] = norm_series(df[COL_PERIOD])
+        df[COL_DAYS] = norm_series(df[COL_DAYS])
         df[COL_STATUS] = df[COL_STATUS].astype(str).apply(norm)
-        df[COL_DAYS]   = df[COL_DAYS].astype(str).apply(norm)
 
         return df
 

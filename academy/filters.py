@@ -6,13 +6,18 @@ from .config import COL_DAYS, COL_PERIOD, WEEKDAY_ORDER
 
 
 def norm_series(sr: pd.Series) -> pd.Series:
-    """Series 전용 정규화: NaN -> '', NBSP/전각공백/모든 공백 제거"""
+    """Series 전용 정규화: NaN -> '', 공백 및 기호(/)를 콤마(,)로 통일!"""
     return (
         sr.fillna("")
           .astype(str)
-          .str.replace("\u00A0", "", regex=False)  # NBSP
-          .str.replace("\u3000", "", regex=False)  # 전각공백
-          .str.replace(r"\s+", "", regex=True)     # 모든 공백류
+          .str.replace("\u00A0", " ", regex=False)  # 특수공백을 일단 일반공백으로
+          .str.replace("\u3000", " ", regex=False)  # 전각공백도 일반공백으로
+          # ✨ 핵심: 모든 공백류(\s)와 슬래시(/)를 콤마(,)로 통일!
+          .str.replace(r"[\s/]+", ",", regex=True)
+          # ✨ 혹시 "월1, 수2" 처럼 쳐서 ",,"가 된 경우를 위해 콤마 1개로 압축
+          .str.replace(r",+", ",", regex=True)
+          # 양끝에 남은 콤마 제거
+          .str.strip(",")
     )
 
 
