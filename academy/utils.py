@@ -8,7 +8,7 @@ from datetime import date
 import pandas as pd
 
 from .config import (
-    COL_ID, COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS,
+    COL_ID, COL_NAME, COL_SCHOOL, COL_GRADE,
     WEEKDAY_ORDER
 )
 

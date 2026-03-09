@@ -8,6 +8,48 @@ from .config import (
 from .utils import split_days, extract_period_numbers, match_attendance, get_student_key, sanitize_letter
 from .filters import filter_students_for_day_period
 
+GRADE_SORT_MAP = {str(g).strip(): i for i, g in enumerate(GRADE_ORDER)}
+
+
+def get_school_rank(school_name: str) -> int:
+    name = str(school_name).strip()
+    if not name:
+        return 99
+    if name.endswith("초"):
+        return 1
+    if name.endswith("중"):
+        return 2
+    if name.endswith("고"):
+        return 3
+    return 4
+
+
+def format_grouped_names(
+    group_df: pd.DataFrame,
+    key_col: str,
+    name_col: str,
+    show_key: bool,
+    show_count: bool,
+    key_wrapper: callable,
+    spacer: str = " "
+) -> str:
+    formatted_groups = []
+
+    for key, sub_group in group_df.groupby(key_col, sort=False):
+        names_list = sub_group[name_col].tolist()
+        names_str = " ".join(names_list)
+        count = len(names_list)
+
+        key_text = key_wrapper(key) if show_key else ""
+        count_text = f" {count}명" if (show_count and count >= 4) else ""
+
+        if count == 1:
+            formatted_groups.append(f"{key_text}{names_str}{count_text}")
+        else:
+            formatted_groups.append(f"{key_text}[{names_str}]{count_text}")
+
+    return spacer.join(formatted_groups)
+
 
 def generate_total_list_html(df: pd.DataFrame) -> str:
     html = "<table class='total-list-table' style='width:100%;'><thead><tr>"
@@ -19,7 +61,7 @@ def generate_total_list_html(df: pd.DataFrame) -> str:
         html += f"<th style='width:{w};'>{c}</th>"
     html += "</tr></thead><tbody>"
 
-    for _, r in df.iterrows():
+    for r in df.to_dict("records"):
         html += "<tr>"
         for c in cols:
             html += f"<td>{r[c]}</td>"
@@ -43,23 +85,15 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
         group_sorted = group.sort_values(by=[COL_SCHOOL, COL_NAME])
 
         if show_school or show_count:
-            formatted_groups = []
-            for school, school_group in group_sorted.groupby(COL_SCHOOL, sort=False):
-                names_list = school_group[COL_NAME].tolist()
-                names_str = " ".join(names_list)
-                count = len(names_list)
-
-                school_text = f"【{school}】" if show_school else ""
-                count_text = f" {count}명" if (show_count and count >= 4) else ""
-
-                # ✅ <div>를 벗겨내고 원래대로 텍스트만 묶습니다.
-                if count == 1:
-                    formatted_groups.append(f"{school_text}{names_str}{count_text}")
-                else:
-                    formatted_groups.append(f"{school_text}[{names_str}]{count_text}")
-
-            # ✅ 띄어쓰기(" ")를 기준으로 가로로 쭉 이어 붙입니다.
-            names_final_str = "&nbsp;&nbsp;&nbsp;&nbsp;".join(formatted_groups)
+            names_final_str = format_grouped_names(
+                group_sorted,
+                key_col=COL_SCHOOL,
+                name_col=COL_NAME,
+                show_key=show_school,
+                show_count=show_count,
+                key_wrapper=lambda school: f"【{school}】",
+                spacer="&nbsp;&nbsp;&nbsp;&nbsp;"
+            )
         else:
             names_final_str = " ".join(group_sorted[COL_NAME].tolist())
 
@@ -75,29 +109,23 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
         if df_target.empty:
             return ""
 
-        groups = []
         if is_show_school or is_show_count:
-            for school, school_group in df_target.groupby(COL_SCHOOL, sort=False):
-                names_list = school_group[COL_NAME].tolist()
-                names_str = " ".join(names_list)
-                count = len(names_list)
-
-                school_text = f"【{school}】" if is_show_school else ""
-                count_text = f" {count}명" if (is_show_count and count >= 4) else ""
-
-                if count == 1:
-                    groups.append(f"{school_text}{names_str}{count_text}")
-                else:
-                    groups.append(f"{school_text}[{names_str}]{count_text}")
+            body = format_grouped_names(
+                df_target,
+                key_col=COL_SCHOOL,
+                name_col=COL_NAME,
+                show_key=is_show_school,
+                show_count=is_show_count,
+                key_wrapper=lambda school: f"【{school}】",
+                spacer=" "
+            )
         else:
+            groups = []
             for _, school_group in df_target.groupby(COL_SCHOOL, sort=False):
                 groups.append(" ".join(school_group[COL_NAME].tolist()))
+            body = " ".join(groups)
 
-        return (
-            f"<div class='t1-summary-line'><strong>{label}:</strong> "
-            + " ".join(groups)
-            + "</div>"
-        )
+        return f"<div class='t1-summary-line'><strong>{label}:</strong> {body}</div>"
 
     str_1day = get_summary_str(1, "주 1회", show_school, show_count)
     str_3day = get_summary_str(3, "주 3회", show_school, show_count)
@@ -124,7 +152,6 @@ def generate_table2(df: pd.DataFrame, month_text: str) -> str:
     periods = sorted(periods_set) if periods_set else [1, 2, 3]
 
     # ✅ 학년 정렬용 딕셔너리
-    grade_sort_map = {g: i for i, g in enumerate(GRADE_ORDER)}
 
     for p in periods:
         html += "<div class='a4-print-box'><table class='weekly-table'><thead><tr>"
@@ -148,7 +175,7 @@ def generate_table2(df: pd.DataFrame, month_text: str) -> str:
 
             if not students.empty:
                 # 학년(GRADE_ORDER) -> 학교 -> 이름 정렬
-                students["_grade_order"] = students[COL_GRADE].map(grade_sort_map).fillna(999)
+                students["_grade_order"] = students[COL_GRADE].astype(str).str.strip().map(GRADE_SORT_MAP).fillna(999)
                 students = students.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
 
                 for _, r in students.iterrows():
@@ -192,8 +219,6 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
     if not include_paused:
         df_day = df_day[df_day[COL_STATUS] == "재원"]
 
-    grade_sort_map = {g: i for i, g in enumerate(GRADE_ORDER)}
-
     # ✅ 제목 (inline 유지: 기존과 동일)
     html = (
         f"<h2 class='t3-title' style='text-align:left; font-size:16pt; border-bottom:2px solid black;"
@@ -214,7 +239,13 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
             rows[p] = []
             continue
 
-        df_p["_grade_order"] = df_p[COL_GRADE].map(grade_sort_map).fillna(999)
+        df_p["_grade_order"] = (
+            df_p[COL_GRADE]
+            .astype(str)
+            .str.strip()
+            .map(GRADE_SORT_MAP)
+            .fillna(999)
+        )
         df_p = df_p.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
 
         last_grade = None
@@ -369,22 +400,11 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
 def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
     df_active = df[df[COL_STATUS] == "재원"].copy()
     
-    # ✅ 1) 학교급 정렬용 보조 함수: 초(1) -> 중(2) -> 고(3) -> 기타(4)
-    def get_school_rank(school_name):
-        name = str(school_name).strip()
-        if not name: return 99
-        if name.endswith("초"): return 1
-        elif name.endswith("중"): return 2
-        elif name.endswith("고"): return 3
-        else: return 4
-
-    # ✅ 2) 학교 이름 추출 후 [1순위: 학교급(초/중/고), 2순위: 가나다순] 정렬
+    # ✅ 1) 학교 이름 추출 후 [1순위: 학교급(초/중/고), 2순위: 가나다순] 정렬
     unique_schools = df_active[COL_SCHOOL].dropna().unique().tolist()
     unique_schools.sort(key=lambda x: (get_school_rank(x), str(x)))
 
     # 학년 정렬 기준표 (GRADE_ORDER: 초1 -> 초2 -> ... 고3)
-    grade_sort_map = {str(g).strip(): i for i, g in enumerate(GRADE_ORDER)}
-
     html = f"<h2 style='text-align:center; font-size:16pt;'>학교별 명단 ({month_text})</h2>"
     
     # 1번 표의 비율(8%, 84%, 8%)과 큼직한 글자 스타일(table1-custom)유지, 첫번째 비율은 변경
@@ -400,29 +420,19 @@ def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
         group["_grade_clean"] = group[COL_GRADE].astype(str).str.strip()
 
         # [같은 학교 내 정렬] 1순위: 학년 순서, 2순위: 이름 가나다순
-        group["_grade_order"] = group["_grade_clean"].map(grade_sort_map).fillna(999)
+        group["_grade_order"] = group["_grade_clean"].map(GRADE_SORT_MAP).fillna(999)
         group_sorted = group.sort_values(by=["_grade_order", COL_NAME])
 
-        formatted_groups = []
-        
         if show_grade:
-            # 정렬된 순서를 그대로 유지하면서(sort=False) 학년별로 묶어줍니다.
-            for grade, grade_group in group_sorted.groupby("_grade_clean", sort=False):
-                names_list = grade_group[COL_NAME].tolist()
-                names_str = " ".join(names_list)
-                count = len(names_list)
-                
-                # 【학년】 뒤에 한 칸 띄우기 적용!
-                grade_text = f"【{grade}】 "
-                count_text = f" {count}명" if count >= 4 else ""
-                
-                if count == 1:
-                    formatted_groups.append(f"{grade_text}{names_str}{count_text}")
-                else:
-                    formatted_groups.append(f"{grade_text}[{names_str}]{count_text}")
-            
-            # ✅ 띄어쓰기 4칸(&nbsp; 4개)을 기준으로 학년 덩어리들을 이어 붙입니다!
-            names_final_str = "&nbsp;&nbsp;&nbsp;&nbsp;".join(formatted_groups)
+            names_final_str = format_grouped_names(
+                group_sorted,
+                key_col="_grade_clean",
+                name_col=COL_NAME,
+                show_key=True,
+                show_count=True,
+                key_wrapper=lambda grade: f"【{grade}】 ",
+                spacer="&nbsp;&nbsp;&nbsp;&nbsp;"
+            )
         else:
             names_final_str = " ".join(group_sorted[COL_NAME].tolist())
 
