@@ -25,6 +25,7 @@ HTML / CSS
 
 **[Project Structure]**
 
+'''
 academy/
  ├ config.py
  ├ data.py
@@ -34,3 +35,4 @@ academy/
  └ ui.py
 
 app.py
+'''
