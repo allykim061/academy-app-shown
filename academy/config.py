@@ -23,3 +23,47 @@ REQUIRED_COLUMNS = {
 
 GRADE_ORDER = ["초1", "초2", "초3", "초4", "초5", "초6", "중1", "중2", "중3", "고1", "고2", "고3"]
 WEEKDAY_ORDER = ["월", "화", "수", "목", "금", "토", "일"]
+
+WORKSHEET_ATTENDANCE_DATA = "attendance_data"
+WORKSHEET_STUDENTS_MONTHLY_DATA = "students_monthly_data"
+
+#batch prefix
+ATTENDANCE_BATCH_PREFIX = "att"
+MONTHLY_BATCH_PREFIX = "monthly"
+
+# attendance_data columns
+COL_ATT_DATE = "날짜"
+COL_ATT_PERIOD = "교시"
+COL_ATT_STUDENT_KEY = "학생고유키"
+COL_ATT_LETTER = "배정알파벳"
+COL_ATT_ABSENT = "결석여부"
+COL_ATT_UPDATED_AT = "수정시각"
+COL_ATT_BATCH_ID = "저장배치ID"
+
+ATTENDANCE_DATA_COLUMNS = [
+    COL_ATT_DATE,
+    COL_ATT_PERIOD,
+    COL_ATT_STUDENT_KEY,
+    COL_ATT_LETTER,
+    COL_ATT_ABSENT,
+    COL_ATT_UPDATED_AT,
+    COL_ATT_BATCH_ID,
+]
+
+# students_monthly_data columns
+COL_MONTHLY_MONTH = "기준월"
+COL_MONTHLY_SAVED_AT = "저장일시"
+COL_MONTHLY_BATCH_ID = "저장배치ID"
+
+STUDENTS_MONTHLY_DATA_COLUMNS = [
+    COL_MONTHLY_MONTH,
+    COL_MONTHLY_SAVED_AT,
+    COL_MONTHLY_BATCH_ID,
+    COL_ID,
+    COL_NAME,
+    COL_SCHOOL,
+    COL_GRADE,
+    COL_DAYS,
+    COL_PERIOD,
+    COL_STATUS,
+]

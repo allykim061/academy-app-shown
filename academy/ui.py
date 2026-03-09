@@ -14,6 +14,7 @@ from .tables import (
 )
 from .filters import filter_students_for_day_period
 from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days
+from .backup import save_attendance_for_date, load_attendance_for_date
 
 def run_app():
     df = load_data()
@@ -152,24 +153,31 @@ def run_app():
     # 탭 3
     with tab_list[3]:
         st.markdown(print_banner, unsafe_allow_html=True)
+
         if not df.empty:
-            # ✅ 여기 중요: 배포(UTC)에서도 KST 기준 날짜로 기본값 고정
+            # 기본 날짜
             d3 = st.date_input("날짜 선택", value=today_kst())
 
             weekday = WEEKDAY_ORDER[d3.weekday()]
             date_key = d3.isoformat()
-            
-            # ✅ day_store 스키마: {(p, skey): {"letter": "A", "absent": False}}
+
+            # 날짜별 저장 데이터 1회 자동 복구
+            try:
+                restored = load_attendance_for_date(date_key)
+                st.session_state["assignments"][date_key] = restored
+            except Exception:
+                st.session_state["assignments"].setdefault(date_key, {})
+
             day_store = st.session_state["assignments"].setdefault(date_key, {})
 
-            # 해당 요일 + 재원만 (✅ split_days 적용)
+            # 해당 요일 + 재원만
             day_mask = df[COL_DAYS].astype(str).apply(lambda x: weekday in split_days(x))
             df_day = df[day_mask].copy()
             df_day = df_day[df_day[COL_STATUS] == "재원"]
 
             grade_sort_map = {g: i for i, g in enumerate(GRADE_ORDER)}
 
-            # 교시별 학생 목록 (안정 필터)
+            # 교시별 학생 목록
             per_period_students = {}
             for p in [1, 2, 3]:
                 df_p = filter_students_for_day_period(df_day, weekday, p).copy()
@@ -177,11 +185,14 @@ def run_app():
                 df_p = df_p.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
                 per_period_students[p] = df_p
 
-            # 배정/결석 입력 UI (인쇄 제외) - 엑셀형 최종 확정!
+            # 배정/결석 입력 UI
             with st.expander("📝 배정, 결석 입력", expanded=False):
                 st.caption("💡 배정: 알파벳 1글자 입력 · Enter / 방향키 이동")
-                
-                # 버퍼링 방지용 폼
+
+                apply_clicked = False
+                save_clicked = False
+                reset_clicked = False
+
                 with st.form(key=f"assign_form_{date_key}", clear_on_submit=False):
                     ec1, ec2, ec3 = st.columns(3)
                     edited_dfs = {}
@@ -193,11 +204,11 @@ def run_app():
                             if df_p.empty:
                                 st.caption("해당 교시 학생 없음")
                                 return None
-                                
+
                             editor_data = []
                             for _, row in df_p.iterrows():
                                 skey = get_student_key(row)
-                                
+
                                 current = day_store.get((p, skey), {})
                                 if isinstance(current, str):
                                     c_let = sanitize_letter(current)
@@ -205,31 +216,29 @@ def run_app():
                                 else:
                                     c_let = sanitize_letter(current.get("letter", ""))
                                     c_abs = bool(current.get("absent", False))
-                                
+
                                 editor_data.append({
                                     "_skey": skey,
                                     "이름": f"{row[COL_NAME]} ({row[COL_SCHOOL]} {row[COL_GRADE]})",
                                     "배정": c_let,
-                                    "결석": c_abs
+                                    "결석": c_abs,
                                 })
-                            
+
                             df_editor = pd.DataFrame(editor_data)
-                            
-                            # 스크롤 없애기 (자동 높이 계산)
                             dynamic_height = (len(df_editor) * 35) + 40
-                            
+
                             edited_df = st.data_editor(
                                 df_editor,
                                 height=dynamic_height,
                                 column_config={
-                                    "_skey": None, # 숨김 키
+                                    "_skey": None,
                                     "이름": st.column_config.TextColumn("이름", disabled=True),
                                     "배정": st.column_config.TextColumn("배정", max_chars=1),
-                                    "결석": st.column_config.CheckboxColumn("결석")
+                                    "결석": st.column_config.CheckboxColumn("결석"),
                                 },
                                 hide_index=True,
                                 key=f"editor_{date_key}_{p}",
-                                use_container_width=True
+                                use_container_width=True,
                             )
                             return edited_df
 
@@ -237,25 +246,54 @@ def run_app():
                     edited_dfs[2] = render_data_editor(ec2, 2)
                     edited_dfs[3] = render_data_editor(ec3, 3)
 
-                    # 적용 버튼
-                    if st.form_submit_button("적용"):
-                        for p in [1, 2, 3]:
-                            df_edited = edited_dfs.get(p)
-                            if df_edited is not None and not df_edited.empty:
-                                for _, row in df_edited.iterrows():
-                                    skey = row["_skey"]
-                                    v_let = row["배정"]
-                                    v_abs = row["결석"]
-                                    
-                                    day_store[(p, skey)] = {
-                                        "letter": sanitize_letter(v_let), 
-                                        "absent": bool(v_abs)
-                                    }
-                        
-                        st.success("출석부에 반영되었습니다.")
+                    btn_apply, btn_save, btn_reset, btn_blank = st.columns([1, 1, 1, 7])
+                    with btn_apply:
+                        apply_clicked = st.form_submit_button("적용", use_container_width=True)
+                    with btn_save:
+                        save_clicked = st.form_submit_button(
+                            "저장",
+                            use_container_width=True,
+                            type="primary"
+                        )
+                    with btn_reset:
+                        reset_clicked = st.form_submit_button("초기화", use_container_width=True)
 
-            # 출석부 표 렌더링
-            st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table3(df, d3, False, day_store)}</div></div>", unsafe_allow_html=True)
+                # 초기화: 현재 화면 입력만 비움
+                if reset_clicked:
+                    st.session_state["assignments"][date_key] = {}
+                    st.rerun()
+
+                # 적용 / 저장: 현재 편집값을 day_store에 반영
+                if apply_clicked or save_clicked:
+                    for p in [1, 2, 3]:
+                        df_edited = edited_dfs.get(p)
+                        if df_edited is not None and not df_edited.empty:
+                            for _, row in df_edited.iterrows():
+                                skey = row["_skey"]
+                                v_let = row["배정"]
+                                v_abs = row["결석"]
+
+                                day_store[(p, skey)] = {
+                                    "letter": sanitize_letter(v_let),
+                                    "absent": bool(v_abs),
+                                }
+
+                    st.success("출석부에 반영되었습니다.")
+
+                # 저장: 반영 + 구글 시트 저장
+                if save_clicked:
+                    try:
+                        save_attendance_for_date(date_key, day_store)
+                        st.success("배정/결석 데이터가 저장되었습니다.")
+                    except Exception as e:
+                        st.error(f"저장 실패: {e}")
+
+            # 출석부 표 렌더링 (항상 표시)
+            st.markdown(
+                f"<div class='a4-print-box'><div class='report-view'>{generate_table3(df, d3, False, day_store)}</div></div>",
+                unsafe_allow_html=True
+            )
+
     # 탭 4
     with tab_list[4]:
         st.markdown(print_banner, unsafe_allow_html=True)
