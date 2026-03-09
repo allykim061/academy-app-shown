@@ -1,19 +1,71 @@
 # Academy Document Generation system
+
 **[Details]**
 
-A web application that automatically generates academy management documents
-such as student lists, class schedules, and attendance sheets using Google Sheets data.
+학원 운영에서 반복적으로 생성되는 문서 작업을 자동화하기 위해 개발된 웹 애플리케이션입니다.
+Google Sheets에 저장된 학생 데이터를 기반으로 다음과 같은 문서를 자동으로 생성합니다:
+	•	학생 전체 명단
+	•	학년별 명단
+	•	수업시간별 명단
+	•	일일 출석부
+	•	학교별 명단
 
-This tool was developed to replace repetitive manual document creation
-in a real academy environment.
+Streamlit 기반 웹 인터페이스를 통해 데이터를 불러오고, A4 인쇄에 최적화된 문서를 생성할 수 있습니다.
+ 
+A Streamlit-based web application that automatically generates academy management documents such as student lists, class schedules, and attendance sheets using Google Sheets data.
+
+This project was developed to replace repetitive manual document creation in a real academy environment.
+
+⸻
+**{Problems]**
+
+In many academies, documents such as student lists, class schedules, and attendance sheets are created manually from spreadsheet data.
+
+This process often involves:
+	•	Repeated copying and formatting
+	•	Manual sorting of students by grade or school
+	•	Creating printable documents for daily operations
+
+These repetitive tasks are time-consuming and prone to formatting inconsistencies.
+⸻
+**[Solution]**
+
+This application converts structured student data stored in Google Sheets into automatically generated documents through a web interface.
+
+The system allows users to:
+	•	Load student data from Google Sheets
+	•	Automatically generate multiple document formats
+	•	Manage attendance and class assignments
+	•	Print A4-optimized documents for academy operations
+
+ ⸻
 
 **[Features]**
 
-- Google Sheets based student data integration
-- Automatic generation of student lists by grade and school
-- Class assignment tables by day and period
-- Interactive attendance assignment editor
-- A4 optimized printing layout
+Student Data Integration
+	•	Load student data directly from Google Sheets
+	•	Manage school, grade, attendance days, and class periods
+
+Automatic Document Generation
+
+The system generates several types of academy documents:
+
+1️⃣ Full Student List
+Searchable roster of all registered students
+
+2️⃣ Grade-based Student List
+Students grouped by grade with optional school grouping
+
+3️⃣ Weekly Class Table
+Students organized by weekday and class period
+
+4️⃣ Daily Attendance Sheet
+Interactive attendance and assignment editor
+
+5️⃣ School-based Student List
+Students grouped by school
+
+⸻
 
 **[Tech stack]**
 
@@ -22,6 +74,8 @@ Streamlit
 Pandas
 Google Sheets API (gspread)
 HTML / CSS
+
+⸻
 
 **[Project Structure]**
 
@@ -36,3 +90,24 @@ academy/
 
 app.py
 ```
+⸻
+
+Version
+
+v1.0
+
+First stable release after codebase refactoring and structural cleanup.
+
+⸻
+
+Future Improvements
+	•	User authentication and role management
+	•	Attendance history storage
+	•	Document customization options
+	•	Performance optimization for larger student datasets
+
+⸻
+
+Author
+
+Developed by Minji Kim, as a project to automate repetitive document generation in academy administration.
