@@ -17,7 +17,8 @@ A Streamlit-based web application that automatically generates academy managemen
 This project was developed to replace repetitive manual document creation in a real academy environment.
 
 ⸻
-**{Problems]**
+
+**[Problems]**
 
 In many academies, documents such as student lists, class schedules, and attendance sheets are created manually from spreadsheet data.
 
@@ -27,7 +28,9 @@ This process often involves:
 	•	Creating printable documents for daily operations
 
 These repetitive tasks are time-consuming and prone to formatting inconsistencies.
+
 ⸻
+
 **[Solution]**
 
 This application converts structured student data stored in Google Sheets into automatically generated documents through a web interface.
@@ -53,11 +56,17 @@ The system generates several types of academy documents:
 1️⃣ Full Student List
 Searchable roster of all registered students
 
+<img width="854" height="377" alt="화면 캡처 2026-03-09 175905" src="https://github.com/user-attachments/assets/4d27ee0a-0ba7-48f7-9efa-eaefd8b42258" />
+
 2️⃣ Grade-based Student List
 Students grouped by grade with optional school grouping
 
+<img width="545" height="355" alt="화면 캡처 2026-03-09 181230" src="https://github.com/user-attachments/assets/fd4828b8-aa62-452d-8a3a-f98a820392fb" />
+
 3️⃣ Weekly Class Table
 Students organized by weekday and class period
+
+<img width="293" height="365" alt="화면 캡처 2026-03-09 181504" src="https://github.com/user-attachments/assets/65f11c9a-176f-4419-86d2-e3b2b0588185" />
 
 4️⃣ Daily Attendance Sheet
 Interactive attendance and assignment editor
