@@ -26,7 +26,7 @@ def run_app():
 
     # ✅ 배정 저장소(session_state)
     if "assignments" not in st.session_state:
-        st.session_state["assignments"] = {}  # {date_iso: {(period, student_key): "A"}}
+        st.session_state["assignments"] = {}  # {date_iso: {(period, student_key): {"letter": "", "absent": False, "memo": ""}}}
 
     # 사이드바
     with st.sidebar:
@@ -269,13 +269,20 @@ def run_app():
                             if isinstance(current, str):
                                 c_let = sanitize_letter(current)
                                 c_abs = False
+                                c_memo = ""
                             else:
                                 c_let = sanitize_letter(current.get("letter", ""))
                                 c_abs = bool(current.get("absent", False))
+                                c_memo = str(current.get("memo", "")).strip()
+
+                            school = str(row[COL_SCHOOL]).strip()
+                            grade = str(row[COL_GRADE]).strip()
+                            school_grade = school + (grade[1:] if school and grade and school[-1] == grade[0] else grade)
 
                             editor_data.append({
                                 "_skey": skey,
-                                "이름": f"{row[COL_NAME]} ({row[COL_SCHOOL]} {row[COL_GRADE]})",
+                                "이름": f"{row[COL_NAME]} ({school_grade})",
+                                "메모": c_memo,
                                 "배정": c_let,
                                 "결석": c_abs,
                             })
@@ -286,9 +293,11 @@ def run_app():
                         edited_df = st.data_editor(
                             df_editor,
                             height=dynamic_height,
+                            column_order=["이름", "메모", "배정", "결석"],
                             column_config={
                                 "_skey": None,
                                 "이름": st.column_config.TextColumn("이름", disabled=True),
+                                "메모": st.column_config.TextColumn("메모", max_chars=8),
                                 "배정": st.column_config.TextColumn("배정", max_chars=1),
                                 "결석": st.column_config.CheckboxColumn("결석"),
                             },
@@ -322,10 +331,12 @@ def run_app():
                             skey = row["_skey"]
                             v_let = row["배정"]
                             v_abs = row["결석"]
+                            v_memo = str(row.get("메모", "")).strip()
 
                             day_store[(p, skey)] = {
                                 "letter": sanitize_letter(v_let),
                                 "absent": bool(v_abs),
+                                "memo": v_memo,
                             }
 
                 st.success("출석부에 반영되었습니다.")
@@ -336,8 +347,6 @@ def run_app():
                     st.success("데이터가 저장되었습니다.")
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
-
-            # (🚨 기존에 있던 좌측 정렬 중단 네비게이션 삭제 완료!)
 
             # ✨ 2. 출력 영역 제목 + 우측 네비 (버튼 2개)
             st.markdown(

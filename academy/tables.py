@@ -265,12 +265,13 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
             skey = get_student_key(row)
             akey = (p, skey)
 
-            data = assignment_map.get(akey, {"letter": "", "absent": False})
+            data = assignment_map.get(akey, {"letter": "", "absent": False, "memo": ""})
             if not isinstance(data, dict):
-                data = {"letter": sanitize_letter(str(data)), "absent": False}
+                data = {"letter": sanitize_letter(str(data)), "absent": False, "memo": ""}
 
             letter = sanitize_letter(data.get("letter", ""))
             is_abs = bool(data.get("absent", False))
+            memo = str(data.get("memo", "")).strip()
 
             if is_abs:
                 p_absent += 1
@@ -283,6 +284,7 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
                 "type": "student",
                 "name_text": name_text,
                 "letter": letter,
+                "memo": memo,
                 "is_abs": is_abs,
                 "is_new_grade": is_new_grade,
             })
@@ -345,12 +347,18 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
                 gap_class = " new-grade-gap" if item.get("is_new_grade") else ""
                 name_text = item.get("name_text", "")
                 letter = item.get("letter", "")
+                memo = item.get("memo", "")
 
                 html += (
                     "<tr class='t3-row'>"
-                    f"<td class='name-cell{abs_class}'><div class='student-inner{gap_class}'>{name_text}</div></td>"
-                    f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>" # 출석 (체크박스 유지)
-                    f"<td><div class='student-inner{gap_class}'>&nbsp;</div></td>"                       # 숙제 (체크박스 지우고 빈칸 띄어쓰기 1개 삽입)
+                    f"<td class='name-cell{abs_class}'>"
+                    f"  <div class='student-inner{gap_class} t3-name-wrap'>"
+                    f"      <span class='t3-name-text'>{name_text}</span>"
+                    f"      <span class='t3-name-memo'>{memo}</span>"
+                    f"  </div>"
+                    f"</td>"
+                    f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>"
+                    f"<td><div class='student-inner{gap_class}'>&nbsp;</div></td>"
                     f"<td class='assign-cell'><div class='student-inner{gap_class}'>{letter}</div></td>"
                     "</tr>"
                 )

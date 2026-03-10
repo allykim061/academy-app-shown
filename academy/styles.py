@@ -262,6 +262,29 @@ def get_print_css(orientation: str = "세로") -> str:
             font-size: 0 !important;
         }}
 
+        .table3-custom .t3-name-wrap {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }}
+
+        .table3-custom .t3-name-text {{
+            flex: 1 1 auto;
+            min-width: 0;
+        }}
+
+        .table3-custom .t3-name-memo {{
+            flex: 0 0 auto;
+            max-width: 90px;
+            font-size: 10.5pt;
+            color: #495057;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+        }}
+
         .table3-custom tbody tr.t3-bottom td {{
             padding: 0 !important;
             height: 0 !important;
