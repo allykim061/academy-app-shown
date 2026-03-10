@@ -157,6 +157,48 @@ def run_app():
         if not df.empty:
             st.markdown("<div id='t3-top'></div>", unsafe_allow_html=True)
 
+            # 네비 버튼 스타일 + 인쇄 시 입력 UI 숨김
+            st.markdown("""
+            <style>
+            .nav-btn {
+                display: inline-block;
+                padding: 6px 14px;
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 6px;
+                color: #495057 !important;
+                text-decoration: none !important;
+                font-size: 13px;
+                font-weight: 500;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+            .nav-btn:hover {
+                background-color: #e9ecef;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .section-nav-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                margin-top: 20px;
+                margin-bottom: 8px;
+            }
+            .section-nav-row h3 {
+                margin: 0;
+                padding: 0;
+            }
+
+            @media print {
+                [data-testid="stDateInput"],
+                [data-testid="stForm"],
+                [data-testid="stCaptionContainer"] {
+                    display: none !important;
+                }
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
             # 날짜 선택
             d3 = st.date_input("날짜 선택", value=today_kst())
             weekday = WEEKDAY_ORDER[d3.weekday()]
@@ -170,16 +212,6 @@ def run_app():
                 st.session_state["assignments"].setdefault(date_key, {})
 
             day_store = st.session_state["assignments"].setdefault(date_key, {})
-
-            # 상단 네비게이션
-            st.markdown(
-                """
-                <div class="no-print" style="margin:8px 0 14px 0;">
-                    <a href="#t3-preview" style="text-decoration:none;">🖨️ 출석부 미리보기</a>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
 
             # 해당 요일 + 재원만
             day_mask = df[COL_DAYS].astype(str).apply(lambda x: weekday in split_days(x))
@@ -196,7 +228,17 @@ def run_app():
                 df_p = df_p.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
                 per_period_students[p] = df_p
 
-            st.markdown("### 배정 · 결석 입력")
+            # ✨ 1. 입력 영역 제목 + 우측 네비 (버튼 1개)
+            st.markdown(
+                """
+                <div class="no-print section-nav-row">
+                    <h3>📝 배정 · 결석 입력</h3>
+                    <a href="#t3-preview" class="nav-btn">🖨️ 출석부 미리보기</a>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
             st.caption("💡 배정: 알파벳 1글자 입력 · Enter / 방향키 이동")
 
             apply_clicked = False
@@ -294,18 +336,21 @@ def run_app():
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
 
-            # 중단 네비 (입력표와 출력표 사이)
+            # (🚨 기존에 있던 좌측 정렬 중단 네비게이션 삭제 완료!)
+
+            # ✨ 2. 출력 영역 제목 + 우측 네비 (버튼 2개)
             st.markdown(
                 """
-                <div class="no-print" style="margin:10px 0 14px 0; display:flex; gap:16px; flex-wrap:wrap;">
-                    <a href="#t3-editor" style="text-decoration:none;">✏️ 입력창으로</a>
-                    <a href="#t3-bottom" style="text-decoration:none;">⬇️ 하단 이동</a>
+                <div class="no-print section-nav-row" style="margin-top:40px; border-top:2px dashed #dee2e6; padding-top:20px;">
+                    <h3>🖨️ 출석부 미리보기</h3>
+                    <div style="display:flex; gap:10px;">
+                        <a href="#t3-editor" class="nav-btn">✏️ 입력창으로</a>
+                        <a href="#t3-bottom" class="nav-btn">⬇️ 하단 이동</a>
+                    </div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-
-            st.markdown("### 출석부 미리보기")
 
             # 출력표 시작 직전 anchor
             st.markdown("<div id='t3-preview'></div>", unsafe_allow_html=True)
@@ -317,16 +362,17 @@ def run_app():
             # 하단 anchor
             st.markdown("<div id='t3-bottom'></div>", unsafe_allow_html=True)
 
-            # 하단 네비
+            # ✨ 3. 하단 네비 (우측 정렬, 버튼 2개)
             st.markdown(
                 """
-                <div class="no-print" style="margin-top:8px; display:flex; gap:16px; flex-wrap:wrap;">
-                    <a href="#t3-editor" style="text-decoration:none;">✏️ 입력창으로</a>
-                    <a href="#t3-preview" style="text-decoration:none;">🖨️ 출석부 미리보기</a>
+                <div class="no-print" style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px; margin-bottom:20px;">
+                    <a href="#t3-editor" class="nav-btn">✏️ 입력창으로</a>
+                    <a href="#t3-preview" class="nav-btn">🖨️ 출석부 미리보기</a>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+            
     # 탭 4
     with tab_list[4]:
         st.markdown(print_banner, unsafe_allow_html=True)
