@@ -349,8 +349,8 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
                 html += (
                     "<tr class='t3-row'>"
                     f"<td class='name-cell{abs_class}'><div class='student-inner{gap_class}'>{name_text}</div></td>"
-                    f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>"
-                    f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>"
+                    f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>" # 출석 (체크박스 유지)
+                    f"<td><div class='student-inner{gap_class}'>&nbsp;</div></td>"                       # 숙제 (체크박스 지우고 빈칸 띄어쓰기 1개 삽입)
                     f"<td class='assign-cell'><div class='student-inner{gap_class}'>{letter}</div></td>"
                     "</tr>"
                 )

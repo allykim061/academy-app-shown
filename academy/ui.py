@@ -192,7 +192,8 @@ def run_app():
             @media print {
                 [data-testid="stDateInput"],
                 [data-testid="stForm"],
-                [data-testid="stCaptionContainer"] {
+                [data-testid="stCaptionContainer"],
+                [data-testid="stAlert"] {
                     display: none !important;
                 }
             }
