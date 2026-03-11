@@ -265,7 +265,7 @@ def get_print_css(orientation: str = "세로") -> str:
         .table3-custom .t3-name-wrap {{
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: baseline;
             gap: 8px;
             width: 100%;
         }}
@@ -277,12 +277,36 @@ def get_print_css(orientation: str = "세로") -> str:
 
         .table3-custom .t3-name-memo {{
             flex: 0 0 auto;
-            max-width: 90px;
-            font-size: 10.5pt;
+            max-width: 72px;
+            font-size: 8.5pt;
             color: #495057;
             text-align: left;
             white-space: nowrap;
             overflow: hidden;
+        }}
+
+        .table3-custom .t3-summary-wrap {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+            width: 100%;
+        }}
+
+        .table3-custom .t3-summary-text {{
+            flex: 1 1 auto;
+            min-width: 0;
+        }}
+
+        .table3-custom .t3-summary-memo {{
+            flex: 0 0 84px;
+            font-size: 9pt;
+            line-height: 1.25;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+            color: #444;
         }}
 
         .table3-custom tbody tr.t3-bottom td {{

@@ -211,7 +211,16 @@ def generate_table2(df: pd.DataFrame, month_text: str) -> str:
     return html
 
 
-def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignment_map: dict) -> str:
+def generate_table3(
+    df: pd.DataFrame,
+    target_date,
+    include_paused: bool,
+    assignment_map: dict,
+    teacher_notes: dict[int, str] | None = None,
+) -> str:
+    if teacher_notes is None:
+        teacher_notes = {1: "", 2: "", 3: ""}
+
     weekday = WEEKDAY_ORDER[target_date.weekday()]
     day_mask = df[COL_DAYS].astype(str).apply(lambda x: weekday in split_days(x))
     df_day = df[day_mask].copy()
@@ -219,7 +228,6 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
     if not include_paused:
         df_day = df_day[df_day[COL_STATUS] == "재원"]
 
-    # ✅ 제목 (inline 유지: 기존과 동일)
     html = (
         f"<h2 class='t3-title' style='text-align:left; font-size:16pt; border-bottom:2px solid black;"
         f" padding-bottom:5px; margin:0 0 8px 0;'>"
@@ -227,15 +235,11 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
     )
     html += "<div class='daily-grid-container'>"
 
-    # -----------------------------
-    # 1) 각 교시 rows[p] 만들기
-    # -----------------------------
     rows = {1: [], 2: [], 3: []}
 
     for p in [1, 2, 3]:
         df_p = filter_students_for_day_period(df_day, weekday, p)
         if df_p.empty:
-            # 교시가 아예 없으면 빈 표를 만들긴 하되, 헤더/마감선 구조는 유지
             rows[p] = []
             continue
 
@@ -252,7 +256,6 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
         p_count, p_absent = 0, 0
         p_alpha_counts = {}
 
-        # 학생 행
         for _, row in df_p.iterrows():
             grade = str(row[COL_GRADE]).replace("\u00A0", "").replace("\u3000", "").strip()
             is_new_grade = (last_grade is not None and grade != last_grade)
@@ -291,7 +294,6 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
 
             last_grade = grade
 
-        # 요약(집계) — “한 줄=한 행”
         total_in_period = p_count + p_absent
         if total_in_period > 0:
             summary_lines = []
@@ -305,28 +307,24 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
                 )
 
             if summary_lines:
-                # ✅ colspan 금지: 4칸 gap으로 세로선 유지
                 rows[p].append({"type": "gap"})
-                for line_text in summary_lines:
-                    rows[p].append({"type": "summary", "text": line_text})
+                for i, line_text in enumerate(summary_lines):
+                    rows[p].append({
+                        "type": "summary",
+                        "text": line_text,
+                        "show_teacher_note": (i == 0),
+                        "teacher_note": teacher_notes.get(p, ""),
+                    })
 
-    # -----------------------------
-    # 2) max_len 구해서 blank padding
-    # -----------------------------
     max_len = max(len(rows[1]), len(rows[2]), len(rows[3])) if not df_day.empty else 0
 
     for p in [1, 2, 3]:
         while len(rows[p]) < max_len:
             rows[p].append({"type": "blank"})
-        # ✅ 마지막 마감선은 “각 교시 표에 1번씩만” (모양 정합성 위해)
         rows[p].append({"type": "bottom"})
 
-    # -----------------------------
-    # 3) 렌더링(각 교시 표 독립)
-    # -----------------------------
-    # ✅ 헤더 폭: 출석/숙제/배정이 답답하면 여기서 더 넓힘
     th_name = "66%"
-    th_small = "11.33%"  # 3개 합이 34% = 66 + 34 = 100
+    th_small = "11.33%"
 
     for p in [1, 2, 3]:
         html += "<div class='period-column'>"
@@ -365,12 +363,28 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
 
             elif t == "summary":
                 text = item.get("text", "")
-                html += (
-                    "<tr class='t3-row'>"
-                    f"<td class='summary-cell'>{text}</td>"
-                    "<td></td><td></td><td></td>"
-                    "</tr>"
-                )
+                show_teacher_note = item.get("show_teacher_note", False)
+                teacher_note = str(item.get("teacher_note", "")).strip()
+
+                if show_teacher_note and teacher_note:
+                    html += (
+                        "<tr class='t3-row'>"
+                        "<td class='summary-cell'>"
+                        "  <div class='t3-summary-wrap'>"
+                        f"      <div class='t3-summary-text'>{text}</div>"
+                        f"      <div class='t3-summary-memo'>{teacher_note}</div>"
+                        "  </div>"
+                        "</td>"
+                        "<td></td><td></td><td></td>"
+                        "</tr>"
+                    )
+                else:
+                    html += (
+                        "<tr class='t3-row'>"
+                        f"<td class='summary-cell'>{text}</td>"
+                        "<td></td><td></td><td></td>"
+                        "</tr>"
+                    )
 
             elif t == "gap":
                 html += (
@@ -383,7 +397,6 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
                 )
 
             elif t == "blank":
-                # ✅ 빈칸 찌그러짐 방지: &nbsp;
                 html += (
                     "<tr class='t3-row t3-blank-row'>"
                     "<td class='t3-blank'>&nbsp;</td>"
@@ -402,7 +415,7 @@ def generate_table3(df: pd.DataFrame, target_date, include_paused: bool, assignm
 
         html += "</tbody></table></div>"
 
-    html += "</div>"  # daily-grid-container end
+    html += "</div>"
     return html
     
 def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:

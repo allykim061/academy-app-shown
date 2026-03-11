@@ -14,7 +14,10 @@ from .tables import (
 )
 from .filters import filter_students_for_day_period
 from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days
-from .backup import save_attendance_for_date, load_attendance_for_date
+from .backup import (
+    save_attendance_for_date, load_attendance_for_date,
+    save_teacher_notes_for_date, load_teacher_notes_for_date
+)
 
 def run_app():
     df = load_data()
@@ -206,13 +209,33 @@ def run_app():
             date_key = d3.isoformat()
 
             # 저장 데이터 불러오기
-            try:
-                restored = load_attendance_for_date(date_key)
-                st.session_state["assignments"][date_key] = restored
-            except Exception:
-                st.session_state["assignments"].setdefault(date_key, {})
+            if date_key not in st.session_state["assignments"]:
+                try:
+                    restored = load_attendance_for_date(date_key)
+                    st.session_state["assignments"][date_key] = restored
+                except Exception:
+                    st.session_state["assignments"][date_key] = {}
 
-            day_store = st.session_state["assignments"].setdefault(date_key, {})
+            day_store = st.session_state["assignments"][date_key]
+
+            # 날짜별 editor/widget 버전값
+            editor_version_key = f"attendance_editor_version_{date_key}"
+            if editor_version_key not in st.session_state:
+                st.session_state[editor_version_key] = 0
+            editor_version = st.session_state[editor_version_key]
+
+            # 집계 결과 저장소
+            summary_key = f"attendance_summary_{date_key}"
+            if summary_key not in st.session_state:
+                st.session_state[summary_key] = {}
+
+            # 교시별 담당/메모 저장소
+            teacher_note_key = f"teacher_notes_{date_key}"
+            if teacher_note_key not in st.session_state:
+                try:
+                    st.session_state[teacher_note_key] = load_teacher_notes_for_date(date_key)
+                except Exception:
+                    st.session_state[teacher_note_key] = {1: "", 2: "", 3: ""}
 
             # 해당 요일 + 재원만
             day_mask = df[COL_DAYS].astype(str).apply(lambda x: weekday in split_days(x))
@@ -229,7 +252,7 @@ def run_app():
                 df_p = df_p.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
                 per_period_students[p] = df_p
 
-            # ✨ 1. 입력 영역 제목 + 우측 네비 (버튼 1개)
+            # 입력 영역 제목 + 우측 네비
             st.markdown(
                 """
                 <div class="no-print section-nav-row">
@@ -242,6 +265,7 @@ def run_app():
 
             st.caption("💡 배정: 알파벳 1글자 입력 · Enter / 방향키 이동")
 
+            summary_clicked = False
             apply_clicked = False
             save_clicked = False
             reset_clicked = False
@@ -249,8 +273,42 @@ def run_app():
             # 입력표 시작 직전 anchor
             st.markdown("<div id='t3-editor'></div>", unsafe_allow_html=True)
 
-            with st.form(key=f"assign_form_{date_key}", clear_on_submit=False):
-                ec1, ec2, ec3 = st.columns(3)
+            def build_period_summary(df_edited: pd.DataFrame | None) -> dict:
+                if df_edited is None or df_edited.empty:
+                    return {
+                        "total": 0,
+                        "absent": 0,
+                        "letters": {}
+                    }
+
+                total = len(df_edited)
+                absent = int(df_edited["결석"].fillna(False).astype(bool).sum())
+
+                letters = {}
+                for raw in df_edited["배정"].fillna(""):
+                    letter = sanitize_letter(raw)
+                    if letter:
+                        letters[letter] = letters.get(letter, 0) + 1
+
+                return {
+                    "total": total,
+                    "absent": absent,
+                    "letters": dict(sorted(letters.items()))
+                }
+
+            with st.form(key=f"assign_form_{date_key}_{editor_version}", clear_on_submit=False):
+                has_p1 = not per_period_students.get(1, pd.DataFrame()).empty
+                has_p2 = not per_period_students.get(2, pd.DataFrame()).empty
+                has_p3 = not per_period_students.get(3, pd.DataFrame()).empty
+
+                if has_p1 and has_p2 and not has_p3:
+                    ec1, ec2, ec3 = st.columns([1, 1, 0.35])
+                elif has_p1 and not has_p2 and has_p3:
+                    ec1, ec2, ec3 = st.columns([1, 0.35, 1])
+                elif not has_p1 and has_p2 and has_p3:
+                    ec1, ec2, ec3 = st.columns([0.35, 1, 1])
+                else:
+                    ec1, ec2, ec3 = st.columns(3)
                 edited_dfs = {}
 
                 def render_data_editor(col, p):
@@ -297,12 +355,12 @@ def run_app():
                             column_config={
                                 "_skey": None,
                                 "이름": st.column_config.TextColumn("이름", disabled=True),
-                                "메모": st.column_config.TextColumn("메모", max_chars=8),
+                                "메모": st.column_config.TextColumn("메모", max_chars=6),
                                 "배정": st.column_config.TextColumn("배정", max_chars=1),
                                 "결석": st.column_config.CheckboxColumn("결석"),
                             },
                             hide_index=True,
-                            key=f"editor_{date_key}_{p}",
+                            key=f"editor_{date_key}_{p}_{editor_version}",
                             use_container_width=True,
                         )
                         return edited_df
@@ -311,17 +369,76 @@ def run_app():
                 edited_dfs[2] = render_data_editor(ec2, 2)
                 edited_dfs[3] = render_data_editor(ec3, 3)
 
-                btn_apply, btn_save, btn_reset, btn_blank = st.columns([1, 1, 1, 7])
+                # 교시별 담당/메모 입력 (form 안)
+                st.markdown(
+                    """
+                    <div class="no-print" style="margin-top:12px; margin-bottom:8px;">
+                        <h4 style="margin:0 0 6px 0; font-size:14px;">메모</h4>
+                        <div style="font-size:12px; color:#666;">
+                            한 줄에 8~10자 정도 입력
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                tn1, tn2, tn3 = st.columns(3)
+
+                with tn1:
+                    note_1 = st.text_area(
+                        "1교시",
+                        value=st.session_state[teacher_note_key].get(1, ""),
+                        height=110,
+                        key=f"teacher_note_1_{date_key}_{editor_version}",
+                        help="한 줄에 8~10자 입력",
+                    )
+
+                with tn2:
+                    note_2 = st.text_area(
+                        "2교시",
+                        value=st.session_state[teacher_note_key].get(2, ""),
+                        height=110,
+                        key=f"teacher_note_2_{date_key}_{editor_version}",
+                        help="한 줄에 8~10자 입력",
+                    )
+
+                with tn3:
+                    note_3 = st.text_area(
+                        "3교시",
+                        value=st.session_state[teacher_note_key].get(3, ""),
+                        height=110,
+                        key=f"teacher_note_3_{date_key}_{editor_version}",
+                        help="한 줄에 8~10자 입력",
+                    )
+
+                btn_summary, btn_apply, btn_save, btn_reset, btn_blank = st.columns([1.2, 1, 1, 1, 6.8])
+
+                with btn_summary:
+                    summary_clicked = st.form_submit_button("합계", use_container_width=True)
+
                 with btn_apply:
                     apply_clicked = st.form_submit_button("적용", use_container_width=True)
+
                 with btn_save:
                     save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
+
                 with btn_reset:
                     reset_clicked = st.form_submit_button("초기화", use_container_width=True)
 
             if reset_clicked:
                 st.session_state["assignments"][date_key] = {}
+                st.session_state[summary_key] = {}
+                st.session_state[teacher_note_key] = {1: "", 2: "", 3: ""}
+                st.session_state.pop(f"preview_html_{date_key}", None)
+                st.session_state[editor_version_key] += 1
                 st.rerun()
+
+            if summary_clicked:
+                summary_result = {}
+                for p in [1, 2, 3]:
+                    df_edited = edited_dfs.get(p)
+                    summary_result[p] = build_period_summary(df_edited)
+                st.session_state[summary_key] = summary_result
 
             if apply_clicked or save_clicked:
                 for p in [1, 2, 3]:
@@ -341,14 +458,85 @@ def run_app():
 
                 st.success("출석부에 반영되었습니다.")
 
+                # 집계 갱신
+                summary_result = {}
+                for p in [1, 2, 3]:
+                    df_edited = edited_dfs.get(p)
+                    summary_result[p] = build_period_summary(df_edited)
+                st.session_state[summary_key] = summary_result
+
+            # 집계 표시
+            summary_data = st.session_state.get(summary_key, {})
+            if summary_data:
+                st.markdown(
+                    """
+                    <div class="no-print" style="margin-top:18px; margin-bottom:10px;">
+                        <h4 style="margin:0 0 8px 0; font-size:14px;">교시별 합계</h4>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                sc1, sc2, sc3 = st.columns(3)
+
+                def render_summary_card(col, p):
+                    with col:
+                        data = summary_data.get(p, {"total": 0, "absent": 0, "letters": {}})
+                        lines = [f"인원 | {data['total']}명"]
+
+                        for letter, count in data["letters"].items():
+                            lines.append(f"{letter} | {count}명")
+
+                        lines.append(f"결석 | {data['absent']}명")
+
+                        body = "<br>".join(lines)
+
+                        st.markdown(
+                            f"""
+                            <div class="no-print" style="
+                                border:1px solid #dee2e6;
+                                border-radius:8px;
+                                background:#f8f9fa;
+                                padding:10px 12px;
+                                margin-bottom:10px;
+                                font-size:13px;
+                                line-height:1.7;
+                            ">
+                                <div style="font-weight:600; margin-bottom:6px;">{p}교시 집계</div>
+                                <div>{body}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                render_summary_card(sc1, 1)
+                render_summary_card(sc2, 2)
+                render_summary_card(sc3, 3)
+           
+            if apply_clicked or save_clicked:
+                st.session_state[teacher_note_key] = {
+                    1: str(note_1).strip(),
+                    2: str(note_2).strip(),
+                    3: str(note_3).strip(),
+                }
+
+                st.session_state[f"preview_html_{date_key}"] = generate_table3(
+                    df,
+                    d3,
+                    False,
+                    day_store,
+                    st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
+                )
+
             if save_clicked:
                 try:
                     save_attendance_for_date(date_key, day_store)
+                    save_teacher_notes_for_date(date_key, st.session_state[teacher_note_key])
                     st.success("데이터가 저장되었습니다.")
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
 
-            # ✨ 2. 출력 영역 제목 + 우측 네비 (버튼 2개)
+            # 출력 영역 제목 + 우측 네비
             st.markdown(
                 """
                 <div class="no-print section-nav-row" style="margin-top:40px; border-top:2px dashed #dee2e6; padding-top:20px;">
@@ -364,15 +552,26 @@ def run_app():
 
             # 출력표 시작 직전 anchor
             st.markdown("<div id='t3-preview'></div>", unsafe_allow_html=True)
+
+            preview_key = f"preview_html_{date_key}"
+            if preview_key not in st.session_state:
+                st.session_state[preview_key] = generate_table3(
+                    df,
+                    d3,
+                    False,
+                    day_store,
+                    st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
+                )
+
             st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{generate_table3(df, d3, False, day_store)}</div></div>",
+                f"<div class='a4-print-box'><div class='report-view'>{st.session_state[preview_key]}</div></div>",
                 unsafe_allow_html=True
             )
 
             # 하단 anchor
             st.markdown("<div id='t3-bottom'></div>", unsafe_allow_html=True)
 
-            # ✨ 3. 하단 네비 (우측 정렬, 버튼 2개)
+            # 하단 네비
             st.markdown(
                 """
                 <div class="no-print" style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px; margin-bottom:20px;">

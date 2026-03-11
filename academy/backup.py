@@ -13,8 +13,10 @@ from .config import (
     SCOPE,
     WORKSHEET_ATTENDANCE_DATA,
     WORKSHEET_STUDENTS_MONTHLY_DATA,
+    WORKSHEET_ATTENDANCE_TEACHER_NOTES,
     ATTENDANCE_DATA_COLUMNS,
     STUDENTS_MONTHLY_DATA_COLUMNS,
+    ATTENDANCE_TEACHER_NOTE_COLUMNS,
     ATTENDANCE_BATCH_PREFIX,
     MONTHLY_BATCH_PREFIX,
     COL_ATT_DATE,
@@ -22,11 +24,16 @@ from .config import (
     COL_ATT_STUDENT_KEY,
     COL_ATT_LETTER,
     COL_ATT_ABSENT,
+    COL_ATT_MEMO,
     COL_ATT_UPDATED_AT,
     COL_ATT_BATCH_ID,
     COL_MONTHLY_MONTH,
     COL_MONTHLY_SAVED_AT,
     COL_MONTHLY_BATCH_ID,
+    COL_TNOTE_DATE,
+    COL_TNOTE_PERIOD,
+    COL_TNOTE_NOTE,
+    COL_TNOTE_UPDATED_AT,
     COL_ID,
     COL_NAME,
     COL_SCHOOL,
@@ -82,13 +89,14 @@ def serialize_day_store(date_key: str, day_store: DayStore, batch_id: str) -> li
 
     for (period, student_key), data in day_store.items():
         if not isinstance(data, dict):
-            data = {"letter": sanitize_letter(str(data)), "absent": False}
+            data = {"letter": sanitize_letter(str(data)), "absent": False, "memo": ""}
 
         letter = sanitize_letter(data.get("letter", ""))
         absent = bool(data.get("absent", False))
+        memo = str(data.get("memo", "")).strip()
 
         # 완전히 빈 값은 저장하지 않음
-        if not letter and not absent:
+        if not letter and not absent and not memo:
             continue
 
         rows.append([
@@ -99,6 +107,7 @@ def serialize_day_store(date_key: str, day_store: DayStore, batch_id: str) -> li
             absent,
             updated_at,
             batch_id,
+            memo,
         ])
 
     return rows
@@ -123,6 +132,7 @@ def deserialize_attendance_rows(records: list[dict]) -> DayStore:
         day_store[(period, student_key)] = {
             "letter": sanitize_letter(row.get(COL_ATT_LETTER, "")),
             "absent": absent,
+            "memo": str(row.get(COL_ATT_MEMO, "")).strip(),
         }
 
     return day_store
@@ -245,3 +255,66 @@ def load_students_monthly_snapshot(snapshot_month: str) -> pd.DataFrame:
     latest_df = df[df[COL_MONTHLY_BATCH_ID] == latest_batch_id].copy()
 
     return latest_df.reset_index(drop=True)
+
+
+def save_teacher_notes_for_date(date_key: str, teacher_notes: dict[int, str]) -> None:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_ATTENDANCE_TEACHER_NOTES,
+        ATTENDANCE_TEACHER_NOTE_COLUMNS,
+    )
+
+    updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+
+    all_values = ws.get_all_values()
+    if not all_values:
+        ws.append_row(ATTENDANCE_TEACHER_NOTE_COLUMNS)
+        all_values = [ATTENDANCE_TEACHER_NOTE_COLUMNS]
+
+    keep_rows = [all_values[0]]
+    for row in all_values[1:]:
+        if len(row) > 0 and row[0] != date_key:
+            keep_rows.append(row)
+
+    ws.clear()
+    ws.update("A1", keep_rows)
+
+    rows = []
+    for period in [1, 2, 3]:
+        note = str(teacher_notes.get(period, "")).strip()
+        rows.append([
+            date_key,
+            period,
+            note,
+            updated_at,
+        ])
+
+    if rows:
+        start_row = len(keep_rows) + 1
+        end_row = start_row + len(rows) - 1
+        ws.update(f"A{start_row}:D{end_row}", rows)
+
+
+def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_ATTENDANCE_TEACHER_NOTES,
+        ATTENDANCE_TEACHER_NOTE_COLUMNS,
+    )
+
+    records = ws.get_all_records()
+    rows = [r for r in records if str(r.get(COL_TNOTE_DATE, "")).strip() == date_key]
+
+    result = {1: "", 2: "", 3: ""}
+    for row in rows:
+        try:
+            period = int(row.get(COL_TNOTE_PERIOD, 0))
+        except Exception:
+            continue
+
+        if period in [1, 2, 3]:
+            result[period] = str(row.get(COL_TNOTE_NOTE, "")).strip()
+
+    return result
