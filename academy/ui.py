@@ -13,10 +13,12 @@ from .tables import (
     generate_table1, generate_table2, generate_table3, generate_table4
 )
 from .filters import filter_students_for_day_period
-from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days
+from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days, match_attendance
 from .backup import (
     save_attendance_for_date, load_attendance_for_date,
-    save_teacher_notes_for_date, load_teacher_notes_for_date
+    save_teacher_notes_for_date, load_teacher_notes_for_date,
+    load_weekly_slot_memos, save_weekly_slot_memos,
+    load_weekly_period_notes, save_weekly_period_notes,
 )
 
 def run_app():
@@ -150,8 +152,235 @@ def run_app():
     with tab_list[2]:
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
-            m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
-            st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table2(df, m2)}</div></div>", unsafe_allow_html=True)
+            st.markdown("<div class='no-print'>", unsafe_allow_html=True)
+
+            top_col1, top_col2 = st.columns(2)
+
+            with top_col1:
+                m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
+
+            with top_col2:
+                selected_period = st.selectbox(
+                    "편집할 교시",
+                    [1, 2, 3],
+                    format_func=lambda x: f"{x}교시",
+                    key="weekly_selected_period"
+                )
+            # 2번표 저장값 로드
+            weekly_slot_memo_key = "weekly_slot_memos"
+            if weekly_slot_memo_key not in st.session_state:
+                try:
+                    st.session_state[weekly_slot_memo_key] = load_weekly_slot_memos()
+                except Exception:
+                    st.session_state[weekly_slot_memo_key] = {}
+
+            weekly_period_note_key = "weekly_period_notes"
+            if weekly_period_note_key not in st.session_state:
+                try:
+                    st.session_state[weekly_period_note_key] = load_weekly_period_notes()
+                except Exception:
+                    st.session_state[weekly_period_note_key] = {1: "", 2: "", 3: ""}
+
+            # 재원생만 사용
+            df_active = df[df[COL_STATUS] == "재원"].copy()
+
+            grade_sort_map = {g: i for i, g in enumerate(GRADE_ORDER)}
+            df_active["_grade_order"] = df_active[COL_GRADE].map(grade_sort_map).fillna(999)
+            df_active = df_active.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
+
+            target_days = ["월", "화", "수", "목"]
+
+            st.markdown(
+                """
+                <div class="no-print">
+                    <h3 style="margin:0 0 6px 0;">메모 입력</h3>
+                    <div style="font-size:12px; color:#666; margin-bottom:8px;">
+                        메모 최대 6자, 학년 칸에 입력하지 마세요.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # 선택 교시의 요일별 학생 목록
+            slot_students = {}
+            for day in target_days:
+                condition = df_active.apply(
+                    lambda row: match_attendance(row[COL_DAYS], row[COL_PERIOD], day, selected_period),
+                    axis=1
+                )
+                slot_students[day] = df_active[condition].copy()
+
+            def render_weekly_day_cell(container, df_slot: pd.DataFrame, day: str, period: int, edited_slot_memos: dict):
+                with container:
+                    if df_slot.empty:
+                        st.caption("—")
+                        return
+
+                    editor_rows = []
+                    last_grade = None
+
+                    for _, row in df_slot.iterrows():
+                        skey = get_student_key(row)
+                        school = str(row[COL_SCHOOL]).strip()
+                        grade = str(row[COL_GRADE]).strip()
+
+                        # 학년이 바뀌면 제목 행 추가
+                        if last_grade is None or grade != last_grade:
+                            editor_rows.append({
+                                "_slot_key": f"__grade__|{day}|{period}|{grade}",
+                                "이름": f"【{grade}】",
+                                "메모": "⸺⸺⸺⸺",
+                            })
+
+                        slot_key = (day, period, skey)
+                        slot_key_str = f"{day}|{period}|{skey}"
+
+                        editor_rows.append({
+                            "_slot_key": slot_key_str,
+                            "이름": f"{row[COL_NAME]}({school})",
+                            "메모": edited_slot_memos.get(
+                                slot_key,
+                                st.session_state[weekly_slot_memo_key].get(slot_key, "")
+                            ),
+                        })
+
+                        last_grade = grade
+
+                    df_editor = pd.DataFrame(editor_rows)
+                    dynamic_height = (len(df_editor) * 35) + 40
+
+                    edited_df = st.data_editor(
+                        df_editor,
+                        height=dynamic_height,
+                        column_order=["이름", "메모"],
+                        column_config={
+                            "_slot_key": None,
+                            "이름": st.column_config.TextColumn("이름", disabled=True, width="small"),
+                            "메모": st.column_config.TextColumn("메모", max_chars=6, width="small"),
+                        },
+                        hide_index=True,
+                        key=f"weekly_editor_{day}_{period}",
+                        use_container_width=True,
+                    )
+
+                    for _, erow in edited_df.iterrows():
+                        slot_key_str = str(erow["_slot_key"])
+
+                        if slot_key_str.startswith("__grade__|"):
+                            continue
+
+                        day_str, period_str, student_key = slot_key_str.split("|", 2)
+                        slot_key = (day_str, int(period_str), student_key)
+                        edited_slot_memos[slot_key] = str(erow.get("메모", "")).strip()
+
+            with st.form(key=f"weekly_memo_form_{selected_period}", clear_on_submit=False):
+                header_cols = st.columns([0.65, 1.85, 1.85, 1.85, 1.85])
+                header_labels = ["수업시간", "월", "화", "수", "목"]
+                for col, label in zip(header_cols, header_labels):
+                    with col:
+                        st.markdown(
+                            f"""
+                            <div class="no-print" style="
+                                border:1px solid #dee2e6;
+                                background:#f8f9fa;
+                                padding:8px 6px;
+                                text-align:center;
+                                font-weight:600;
+                                font-size:13px;
+                                border-radius:6px;
+                                margin-bottom:6px;
+                            ">
+                                {label}
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                edited_slot_memos = {}
+                row_cols = st.columns([0.65, 1.85, 1.85, 1.85, 1.85], vertical_alignment="top")
+
+                with row_cols[0]:
+                    st.markdown(
+                        f"""
+                        <div class="no-print" style="
+                            border:1px solid #dee2e6;
+                            background:#fafafa;
+                            padding:10px 6px;
+                            text-align:center;
+                            font-weight:600;
+                            font-size:13px;
+                            border-radius:6px;
+                        ">
+                            {selected_period}교시
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                render_weekly_day_cell(row_cols[1], slot_students["월"], "월", selected_period, edited_slot_memos)
+                render_weekly_day_cell(row_cols[2], slot_students["화"], "화", selected_period, edited_slot_memos)
+                render_weekly_day_cell(row_cols[3], slot_students["수"], "수", selected_period, edited_slot_memos)
+                render_weekly_day_cell(row_cols[4], slot_students["목"], "목", selected_period, edited_slot_memos)
+
+                st.markdown(
+                    """
+                    <div class="no-print" style="margin-top:14px; margin-bottom:6px; display:flex; align-items:baseline; gap:8px;">
+                        <div style="font-weight:600; font-size:13px;">비고</div>
+                        <div style="font-size:11px; color:#363636;">인쇄: 한 줄에 세로 11자, 가로 17자까지 입력 가능</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                note_val = st.text_area(
+                    "",
+                    value=st.session_state[weekly_period_note_key].get(selected_period, ""),
+                    key=f"weekly_period_note_{selected_period}",
+                    height=180,
+                    label_visibility="collapsed",
+                )
+
+                btn_apply, btn_save, btn_blank = st.columns([1, 1, 6])
+
+                with btn_apply:
+                    apply_weekly_memo_clicked = st.form_submit_button("적용", use_container_width=True)
+
+                with btn_save:
+                    save_weekly_memo_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
+
+            if apply_weekly_memo_clicked or save_weekly_memo_clicked:
+                merged_slot_memos = dict(st.session_state[weekly_slot_memo_key])
+                merged_slot_memos.update(edited_slot_memos)
+
+                merged_period_notes = dict(st.session_state[weekly_period_note_key])
+                merged_period_notes[selected_period] = str(note_val).strip()
+
+                st.session_state[weekly_slot_memo_key] = merged_slot_memos
+                st.session_state[weekly_period_note_key] = merged_period_notes
+
+                st.success("인쇄에 반영되었습니다.")
+
+            if save_weekly_memo_clicked:
+                try:
+                    save_weekly_slot_memos(st.session_state[weekly_slot_memo_key])
+                    save_weekly_period_notes(st.session_state[weekly_period_note_key])
+                    st.success("저장 완료, 인쇄에 반영됩니다")
+                except Exception as e:
+                    st.error(f"저장 실패: {e}")
+
+            st.markdown(
+                """
+                <div class="no-print">
+                    <h3 style="margin:0 0 8px 0;">🖨️ 미리보기</h3>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f"<div class='a4-print-box'><div class='report-view'>{generate_table2(df, m2, st.session_state[weekly_slot_memo_key], st.session_state[weekly_period_note_key])}</div></div>",
+                unsafe_allow_html=True
+            )
 
     # 탭 3
     with tab_list[3]:
@@ -257,7 +486,7 @@ def run_app():
                 """
                 <div class="no-print section-nav-row">
                     <h3>📝 배정 · 결석 입력</h3>
-                    <a href="#t3-preview" class="nav-btn">🖨️ 출석부 미리보기</a>
+                    <a href="#t3-preview" class="nav-btn">🖨️ 미리보기</a>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -390,7 +619,6 @@ def run_app():
                         value=st.session_state[teacher_note_key].get(1, ""),
                         height=110,
                         key=f"teacher_note_1_{date_key}_{editor_version}",
-                        help="한 줄에 8~10자 입력",
                     )
 
                 with tn2:
@@ -399,7 +627,6 @@ def run_app():
                         value=st.session_state[teacher_note_key].get(2, ""),
                         height=110,
                         key=f"teacher_note_2_{date_key}_{editor_version}",
-                        help="한 줄에 8~10자 입력",
                     )
 
                 with tn3:
@@ -408,7 +635,6 @@ def run_app():
                         value=st.session_state[teacher_note_key].get(3, ""),
                         height=110,
                         key=f"teacher_note_3_{date_key}_{editor_version}",
-                        help="한 줄에 8~10자 입력",
                     )
 
                 btn_summary, btn_apply, btn_save, btn_reset, btn_blank = st.columns([1.2, 1, 1, 1, 6.8])
@@ -456,7 +682,7 @@ def run_app():
                                 "memo": v_memo,
                             }
 
-                st.success("출석부에 반영되었습니다.")
+                st.success("저장 완료, 인쇄에 반영됩니다.")
 
                 # 집계 갱신
                 summary_result = {}
@@ -502,7 +728,7 @@ def run_app():
                                 font-size:13px;
                                 line-height:1.7;
                             ">
-                                <div style="font-weight:600; margin-bottom:6px;">{p}교시 집계</div>
+                                <div style="font-weight:600; margin-bottom:6px;">{p}교시 합계</div>
                                 <div>{body}</div>
                             </div>
                             """,
@@ -532,7 +758,7 @@ def run_app():
                 try:
                     save_attendance_for_date(date_key, day_store)
                     save_teacher_notes_for_date(date_key, st.session_state[teacher_note_key])
-                    st.success("데이터가 저장되었습니다.")
+                    st.success("저장 완료")
                 except Exception as e:
                     st.error(f"저장 실패: {e}")
 
@@ -540,7 +766,7 @@ def run_app():
             st.markdown(
                 """
                 <div class="no-print section-nav-row" style="margin-top:40px; border-top:2px dashed #dee2e6; padding-top:20px;">
-                    <h3>🖨️ 출석부 미리보기</h3>
+                    <h3>🖨️ 미리보기</h3>
                     <div style="display:flex; gap:10px;">
                         <a href="#t3-editor" class="nav-btn">✏️ 입력창으로</a>
                         <a href="#t3-bottom" class="nav-btn">⬇️ 하단 이동</a>
@@ -576,7 +802,7 @@ def run_app():
                 """
                 <div class="no-print" style="display:flex; justify-content:flex-end; gap:10px; margin-top:15px; margin-bottom:20px;">
                     <a href="#t3-editor" class="nav-btn">✏️ 입력창으로</a>
-                    <a href="#t3-preview" class="nav-btn">🖨️ 출석부 미리보기</a>
+                    <a href="#t3-preview" class="nav-btn">🖨️ 미리보기</a>
                 </div>
                 """,
                 unsafe_allow_html=True

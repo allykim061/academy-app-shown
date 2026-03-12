@@ -30,6 +30,18 @@ def get_print_css(orientation: str = "세로") -> str:
               sans-serif !important;
         }}
 
+        /* =========================================================
+           Selectbox 커서
+           ========================================================= */
+        div[data-baseweb="select"] * {{
+            cursor: pointer !important;
+        }}
+
+        div[role="listbox"] *,
+        li[role="option"] * {{
+            cursor: pointer !important;
+        }}
+
         .report-view {{
             border: 1px solid #ccc;
             padding: 20px;
@@ -172,6 +184,48 @@ def get_print_css(orientation: str = "세로") -> str:
             font-weight: bold !important;
         }}
 
+        .weekly-name-wrap {{
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 2px;
+            width: 100%;
+        }}
+
+        .weekly-name-text {{
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+        }}
+
+        .weekly-name-memo {{
+            flex: 0 0 auto;
+            width: 56px;
+            min-width: 56px;
+            font-size: 7pt;
+            line-height: 1.15;
+            color: #363636;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            padding-right: 3px;
+            box-sizing: border-box;
+        }}
+
+        .weekly-note-cell {{
+            font-size: 8.5pt;
+            line-height: 1.3;
+            white-space: pre-wrap;
+            word-break: keep-all;
+            overflow-wrap: break-word;
+            text-align: left;
+        }}
+
+        .weekly-count {{
+            margin-top: 4px;
+        }}
+
         /* =========================================================
            3번표(일일 출석부)
            ========================================================= */
@@ -279,7 +333,7 @@ def get_print_css(orientation: str = "세로") -> str:
             flex: 0 0 auto;
             max-width: 72px;
             font-size: 8.5pt;
-            color: #495057;
+            color: #363636;
             text-align: left;
             white-space: nowrap;
             overflow: hidden;
@@ -306,7 +360,7 @@ def get_print_css(orientation: str = "세로") -> str:
             white-space: pre-wrap;
             word-break: keep-all;
             overflow-wrap: break-word;
-            color: #444;
+            color: #000000;
         }}
 
         .table3-custom tbody tr.t3-bottom td {{
@@ -360,10 +414,14 @@ def get_print_css(orientation: str = "세로") -> str:
             .stCheckbox,
             [data-testid="stExpander"],
             .no-print,
-            [data-testid="stDataFrame"] {{
+            [data-testid="stDataFrame"],
+            [data-testid="stSelectbox"],
+            [data-testid="stCaptionContainer"],
+            [data-testid="stAlert"],
+            [data-testid="stForm"] {{
                 display: none !important;
             }}
-
+            
             /* -----------------------------------------------------
                2) 0번표(전체 목록) 인쇄 시 유령 공간 제거
                ----------------------------------------------------- */

@@ -41,6 +41,19 @@ from .config import (
     COL_DAYS,
     COL_PERIOD,
     COL_STATUS,
+    WORKSHEET_WEEKLY_SLOT_MEMOS,
+    COL_WSM_DAY,
+    COL_WSM_PERIOD,
+    COL_WSM_STUDENT_KEY,
+    COL_WSM_MEMO,
+    COL_WSM_UPDATED_AT,
+    WEEKLY_SLOT_MEMO_COLUMNS,
+
+    WORKSHEET_WEEKLY_PERIOD_NOTES,
+    COL_WPN_PERIOD,
+    COL_WPN_NOTE,
+    COL_WPN_UPDATED_AT,
+    WEEKLY_PERIOD_NOTE_COLUMNS,
 )
 from .utils import now_kst, sanitize_letter
 
@@ -316,5 +329,163 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
 
         if period in [1, 2, 3]:
             result[period] = str(row.get(COL_TNOTE_NOTE, "")).strip()
+
+    return result
+
+# 2번표 학생메모
+def save_weekly_slot_memos(slot_memos: dict[tuple[str, int, str], str]) -> None:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_WEEKLY_SLOT_MEMOS,
+        WEEKLY_SLOT_MEMO_COLUMNS,
+    )
+
+    updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+
+    rows = []
+    valid_keys = set()
+
+    for (day, period, student_key), memo in slot_memos.items():
+        day_str = str(day).strip()
+        skey = str(student_key).strip()
+        memo_text = str(memo).strip()
+
+        try:
+            p = int(period)
+        except Exception:
+            continue
+
+        if not day_str or not skey or p <= 0:
+            continue
+
+        valid_keys.add((day_str, str(p), skey))
+        rows.append([
+            day_str,
+            p,
+            skey,
+            memo_text,
+            updated_at,
+        ])
+
+    all_values = ws.get_all_values()
+    if not all_values:
+        ws.append_row(WEEKLY_SLOT_MEMO_COLUMNS)
+        all_values = [WEEKLY_SLOT_MEMO_COLUMNS]
+
+    keep_rows = [all_values[0]]
+
+    for row in all_values[1:]:
+        if len(row) < 3:
+            continue
+
+        row_key = (str(row[0]).strip(), str(row[1]).strip(), str(row[2]).strip())
+        if row_key not in valid_keys:
+            keep_rows.append(row)
+
+    ws.clear()
+    ws.update("A1", keep_rows)
+
+    if rows:
+        start_row = len(keep_rows) + 1
+        end_row = start_row + len(rows) - 1
+        ws.update(f"A{start_row}:E{end_row}", rows)
+
+def load_weekly_slot_memos() -> dict[tuple[str, int, str], str]:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_WEEKLY_SLOT_MEMOS,
+        WEEKLY_SLOT_MEMO_COLUMNS,
+    )
+
+    records = ws.get_all_records()
+
+    result: dict[tuple[str, int, str], str] = {}
+    for row in records:
+        day = str(row.get(COL_WSM_DAY, "")).strip()
+        student_key = str(row.get(COL_WSM_STUDENT_KEY, "")).strip()
+
+        try:
+            period = int(row.get(COL_WSM_PERIOD, 0))
+        except Exception:
+            continue
+
+        if not day or not student_key or period <= 0:
+            continue
+
+        result[(day, period, student_key)] = str(row.get(COL_WSM_MEMO, "")).strip()
+
+    return result
+
+# 2번표 교시별 비고
+def save_weekly_period_notes(period_notes: dict[int, str]) -> None:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_WEEKLY_PERIOD_NOTES,
+        WEEKLY_PERIOD_NOTE_COLUMNS,
+    )
+
+    updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+
+    rows = []
+    for period, note in period_notes.items():
+        try:
+            p = int(period)
+        except Exception:
+            continue
+
+        if p <= 0:
+            continue
+
+        rows.append([
+            p,
+            str(note).strip(),
+            updated_at,
+        ])
+
+    all_values = ws.get_all_values()
+    if not all_values:
+        ws.append_row(WEEKLY_PERIOD_NOTE_COLUMNS)
+        all_values = [WEEKLY_PERIOD_NOTE_COLUMNS]
+
+    keep_rows = [all_values[0]]
+    existing_periods = {str(int(p)) for p in period_notes.keys()}
+
+    for row in all_values[1:]:
+        if len(row) > 0 and str(row[0]).strip() not in existing_periods:
+            keep_rows.append(row)
+
+    ws.clear()
+    ws.update("A1", keep_rows)
+
+    if rows:
+        start_row = len(keep_rows) + 1
+        end_row = start_row + len(rows) - 1
+        ws.update(f"A{start_row}:C{end_row}", rows)
+
+
+def load_weekly_period_notes() -> dict[int, str]:
+    sh = _get_spreadsheet()
+    ws = _get_or_create_worksheet(
+        sh,
+        WORKSHEET_WEEKLY_PERIOD_NOTES,
+        WEEKLY_PERIOD_NOTE_COLUMNS,
+    )
+
+    records = ws.get_all_records()
+
+    result: dict[int, str] = {}
+    for row in records:
+        try:
+            period = int(row.get(COL_WPN_PERIOD, 0))
+        except Exception:
+            continue
+
+        if period <= 0:
+            continue
+
+        result[period] = str(row.get(COL_WPN_NOTE, "")).strip()
 
     return result
