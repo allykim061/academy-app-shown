@@ -3,6 +3,7 @@ import pandas as pd
 
 from .config import (
     COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS,
+    COL_STUDENT_MEMO,
     GRADE_ORDER, WEEKDAY_ORDER
 )
 from .utils import split_days, extract_period_numbers, match_attendance, get_student_key, sanitize_letter
@@ -100,7 +101,6 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
         html += f"<tr><th>{grade}</th><td class='t1-names'>{names_final_str}</td><td>{len(group)}</td></tr>"
         total += len(group)
 
-    # --- 주 N회 합계 요약 부분 ---
     df_active["days_count"] = df_active[COL_DAYS].apply(lambda x: len(split_days(x)))
     summary_texts = []
 
@@ -130,8 +130,10 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
     str_1day = get_summary_str(1, "주 1회", show_school, show_count)
     str_3day = get_summary_str(3, "주 3회", show_school, show_count)
 
-    if str_1day: summary_texts.append(str_1day)
-    if str_3day: summary_texts.append(str_3day)
+    if str_1day:
+        summary_texts.append(str_1day)
+    if str_3day:
+        summary_texts.append(str_3day)
 
     summary_final_str = "".join(summary_texts)
     
@@ -142,12 +144,9 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
 def generate_table2(
     df: pd.DataFrame,
     month_text: str,
-    slot_memos: dict[tuple[str, int, str], str] | None = None,
     period_notes: dict[int, str] | None = None,
 ) -> str:
-    if slot_memos is None:
-        slot_memos = {}
-
+    # slot_memos는 호출부 호환성을 위해 잠시 남겨둠
     if period_notes is None:
         period_notes = {}
 
@@ -196,8 +195,7 @@ def generate_table2(
                     s_str, g_str = str(r[COL_SCHOOL]).strip(), grade
                     school_grade = s_str + (g_str[1:] if s_str and g_str and s_str[-1] == g_str[0] else g_str)
 
-                    skey = get_student_key(r)
-                    memo = str(slot_memos.get((d, p, skey), "")).strip()
+                    memo = str(r.get(COL_STUDENT_MEMO, "")).strip()
 
                     if memo:
                         student_html = (
@@ -234,6 +232,7 @@ def generate_table2(
         html += f"</tr></tbody></table><div class='date-footer'>{month_text}</div></div>"
 
     return html
+
 
 def generate_table3(
     df: pd.DataFrame,
@@ -298,7 +297,7 @@ def generate_table3(
 
             letter = sanitize_letter(data.get("letter", ""))
             is_abs = bool(data.get("absent", False))
-            memo = str(data.get("memo", "")).strip()
+            memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
 
             if is_abs:
                 p_absent += 1
@@ -442,17 +441,15 @@ def generate_table3(
     html += "</div>"
     return html
     
+
 def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
     df_active = df[df[COL_STATUS] == "재원"].copy()
     
-    # ✅ 1) 학교 이름 추출 후 [1순위: 학교급(초/중/고), 2순위: 가나다순] 정렬
     unique_schools = df_active[COL_SCHOOL].dropna().unique().tolist()
     unique_schools.sort(key=lambda x: (get_school_rank(x), str(x)))
 
-    # 학년 정렬 기준표 (GRADE_ORDER: 초1 -> 초2 -> ... 고3)
     html = f"<h2 style='text-align:center; font-size:16pt;'>학교별 명단 ({month_text})</h2>"
     
-    # 1번 표의 비율(8%, 84%, 8%)과 큼직한 글자 스타일(table1-custom)유지, 첫번째 비율은 변경
     html += "<table class='table1-custom table4-custom'><thead><tr><th>학교</th><th>학생 명단</th><th>인원수</th></tr></thead><tbody>"
     
     total = 0
@@ -461,10 +458,7 @@ def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
         if group.empty:
             continue
 
-        # 데이터에 묻어있는 공백 찌꺼기 청소
         group["_grade_clean"] = group[COL_GRADE].astype(str).str.strip()
-
-        # [같은 학교 내 정렬] 1순위: 학년 순서, 2순위: 이름 가나다순
         group["_grade_order"] = group["_grade_clean"].map(GRADE_SORT_MAP).fillna(999)
         group_sorted = group.sort_values(by=["_grade_order", COL_NAME])
 
@@ -481,11 +475,9 @@ def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
         else:
             names_final_str = " ".join(group_sorted[COL_NAME].tolist())
 
-        # t1-names 클래스를 적용해 좌상단 정렬과 행간 띄우기 적용
         html += f"<tr><th>{school}</th><td class='t1-names'>{names_final_str}</td><td>{len(group)}</td></tr>"
         total += len(group)
 
-    # 합계 칸
     html += f"<tr><th>합계</th><td class='t1-names'></td><td>{total}</td></tr></tbody></table>"
     
     return html

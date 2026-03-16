@@ -7,7 +7,8 @@ from google.oauth2.service_account import Credentials
 from .config import (
     SCOPE, WORKSHEET_STUDENTS,
     REQUIRED_COLUMNS,
-    COL_PERIOD, COL_STATUS, COL_DAYS
+    COL_PERIOD, COL_STATUS, COL_DAYS,
+    COL_STUDENT_MEMO,
 )
 from .utils import norm
 from .filters import norm_series
@@ -37,10 +38,15 @@ def load_data() -> pd.DataFrame:
             st.info(f"현재 인식된 항목: {list(df.columns)}")
             st.stop()
 
-        # 3) 주요 문자열 컬럼 정규화 (공백/특수공백 제거)
+        # 3) students 시트 공통 메모 컬럼 보장
+        if COL_STUDENT_MEMO not in df.columns:
+            df[COL_STUDENT_MEMO] = ""
+
+        # 4) 주요 문자열 컬럼 정규화
         df[COL_PERIOD] = norm_series(df[COL_PERIOD])
         df[COL_DAYS] = norm_series(df[COL_DAYS])
         df[COL_STATUS] = df[COL_STATUS].astype(str).apply(norm)
+        df[COL_STUDENT_MEMO] = df[COL_STUDENT_MEMO].fillna("").astype(str).str.strip()
 
         return df
 

@@ -7,7 +7,7 @@ SCOPE = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-WORKSHEET_STUDENTS = "students"  # 시트 탭 이름(너 구글시트에서 쓰는 이름)
+WORKSHEET_STUDENTS = "students"
 
 COL_ID = "학생ID"
 COL_NAME = "이름"
@@ -16,6 +16,7 @@ COL_GRADE = "학년"
 COL_DAYS = "등원요일"
 COL_PERIOD = "수업교시"
 COL_STATUS = "상태"
+COL_STUDENT_MEMO = "메모"
 
 REQUIRED_COLUMNS = {
     COL_ID, COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS
@@ -27,7 +28,6 @@ WEEKDAY_ORDER = ["월", "화", "수", "목", "금", "토", "일"]
 WORKSHEET_ATTENDANCE_DATA = "attendance_data"
 WORKSHEET_STUDENTS_MONTHLY_DATA = "students_monthly_data"
 
-#batch prefix
 ATTENDANCE_BATCH_PREFIX = "att"
 MONTHLY_BATCH_PREFIX = "monthly"
 
@@ -39,7 +39,6 @@ COL_ATT_LETTER = "배정알파벳"
 COL_ATT_ABSENT = "결석여부"
 COL_ATT_UPDATED_AT = "수정시각"
 COL_ATT_BATCH_ID = "저장배치ID"
-COL_ATT_MEMO = "메모"
 
 ATTENDANCE_DATA_COLUMNS = [
     COL_ATT_DATE,
@@ -49,7 +48,6 @@ ATTENDANCE_DATA_COLUMNS = [
     COL_ATT_ABSENT,
     COL_ATT_UPDATED_AT,
     COL_ATT_BATCH_ID,
-    COL_ATT_MEMO,
 ]
 
 # students_monthly_data columns
@@ -82,24 +80,6 @@ ATTENDANCE_TEACHER_NOTE_COLUMNS = [
     COL_TNOTE_PERIOD,
     COL_TNOTE_NOTE,
     COL_TNOTE_UPDATED_AT,
-]
-
-# 2번표메모, 비고 추가
-
-WORKSHEET_WEEKLY_SLOT_MEMOS = "weekly_slot_memos"
-
-COL_WSM_DAY = "요일"
-COL_WSM_PERIOD = "교시"
-COL_WSM_STUDENT_KEY = "학생고유키"
-COL_WSM_MEMO = "메모"
-COL_WSM_UPDATED_AT = "수정시각"
-
-WEEKLY_SLOT_MEMO_COLUMNS = [
-    COL_WSM_DAY,
-    COL_WSM_PERIOD,
-    COL_WSM_STUDENT_KEY,
-    COL_WSM_MEMO,
-    COL_WSM_UPDATED_AT,
 ]
 
 WORKSHEET_WEEKLY_PERIOD_NOTES = "weekly_period_notes"
