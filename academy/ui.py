@@ -39,6 +39,11 @@ def run_app():
 
         if st.button("새로고침"):
             st.cache_data.clear()
+
+            for k in list(st.session_state.keys()):
+                if k.startswith("preview_html_") or k.startswith("attendance_editor_version_"):
+                    del st.session_state[k]
+
             st.rerun()
 
     tab_list = st.tabs(["전체 목록", "학년별 명단", "수업시간 명단", "출석부", "학교별 명단"])
@@ -259,7 +264,7 @@ def run_app():
 
                 st.rerun()
                 
-     # 탭 3
+    # 탭 3
     with tab_list[3]:
         st.markdown(print_banner, unsafe_allow_html=True)
 
@@ -517,7 +522,6 @@ def run_app():
                 st.session_state["assignments"][date_key] = {}
                 st.session_state[summary_key] = {}
                 st.session_state[teacher_note_key] = {1: "", 2: "", 3: ""}
-                st.session_state.pop(f"preview_html_{date_key}", None)
                 st.session_state[editor_version_key] += 1
                 st.rerun()
 
@@ -604,14 +608,6 @@ def run_app():
                     3: str(note_3).strip(),
                 }
 
-                st.session_state[f"preview_html_{date_key}"] = generate_table3(
-                    df,
-                    d3,
-                    False,
-                    day_store,
-                    st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
-                )
-
             if save_clicked:
                 try:
                     save_attendance_for_date(date_key, day_store)
@@ -635,18 +631,16 @@ def run_app():
 
             st.markdown("<div id='t3-preview'></div>", unsafe_allow_html=True)
 
-            preview_key = f"preview_html_{date_key}"
-            if preview_key not in st.session_state:
-                st.session_state[preview_key] = generate_table3(
-                    df,
-                    d3,
-                    False,
-                    day_store,
-                    st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
-                )
+            preview_html = generate_table3(
+                df,
+                d3,
+                False,
+                day_store,
+                st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
+            )
 
             st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{st.session_state[preview_key]}</div></div>",
+                f"<div class='a4-print-box'><div class='report-view'>{preview_html}</div></div>",
                 unsafe_allow_html=True
             )
 
@@ -661,7 +655,6 @@ def run_app():
                 """,
                 unsafe_allow_html=True
             )
-
     # 탭 4
     with tab_list[4]:
         st.markdown(print_banner, unsafe_allow_html=True)
