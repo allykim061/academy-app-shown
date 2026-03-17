@@ -136,6 +136,7 @@ def get_print_css(orientation: str = "세로") -> str:
             font-size: 8pt;
             letter-spacing: -0.6px;
             margin-bottom: 5px;
+            line-height: 1;
         }}
 
         /* =========================================================
@@ -210,12 +211,36 @@ def get_print_css(orientation: str = "세로") -> str:
             min-width: 56px;
             font-size: 7pt;
             line-height: 1.15;
-            color: #363636;
+            color: #2563eb;
             text-align: right;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: clip;
             padding-right: 3px;
+            box-sizing: border-box;
+        }}
+
+        .weekly-name-wrap-vertical {{
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 1px;
+            width: 100%;
+        }}
+
+        .weekly-name-memo-below {{
+            display: block;
+            width: auto;
+            min-width: 0;
+            max-width: 100%;
+            font-size: 6.5pt;
+            line-height: 1.1;
+            color: #2563eb;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            padding-right: 0;
             box-sizing: border-box;
         }}
 
@@ -344,7 +369,25 @@ def get_print_css(orientation: str = "세로") -> str:
             flex: 0 0 auto;
             max-width: 72px;
             font-size: 7pt;
-            color: #363636;
+            color: #2563eb;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+        }}
+
+        .table3-custom .t3-name-wrap-vertical {{
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1px;
+        }}
+
+        .table3-custom .t3-name-memo-below {{
+            display: block;
+            max-width: none;
+            font-size: 7pt;
+            color: #2563eb;
+            line-height: 1.1;
             text-align: left;
             white-space: nowrap;
             overflow: hidden;

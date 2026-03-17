@@ -196,7 +196,14 @@ def generate_table2(
 
                     memo = str(r.get(COL_STUDENT_MEMO, "")).strip()
 
-                    if memo:
+                    if memo and len(memo) >= 6:
+                        student_html = (
+                            "<div class='weekly-name weekly-name-wrap weekly-name-wrap-vertical' style='text-align:left;'>"
+                            f"<span class='weekly-name-text'>{r[COL_NAME]} ({school_grade})</span>"
+                            f"<span class='weekly-name-memo weekly-name-memo-below'>{memo}</span>"
+                            "</div>"
+                        )
+                    elif memo:
                         student_html = (
                             "<div class='weekly-name weekly-name-wrap' style='text-align:left;'>"
                             f"<span class='weekly-name-text'>{r[COL_NAME]} ({school_grade})</span>"
@@ -207,7 +214,6 @@ def generate_table2(
                         student_html = (
                             f"<div class='weekly-name' style='text-align:left;'>{r[COL_NAME]} ({school_grade})</div>"
                         )
-
                     student_list.append(student_html)
                     last_grade = grade
 
@@ -368,20 +374,31 @@ def generate_table3(
                 letter = item.get("letter", "")
                 memo = item.get("memo", "")
 
+                if memo and len(memo) >= 7:
+                    name_html = (
+                        f"<div class='student-inner{gap_class} t3-name-wrap t3-name-wrap-vertical'>"
+                        f"    <span class='t3-name-text'>{name_text}</span>"
+                        f"    <span class='t3-name-memo t3-name-memo-below'>{memo}</span>"
+                        f"</div>"
+                    )
+                else:
+                    name_html = (
+                        f"<div class='student-inner{gap_class} t3-name-wrap'>"
+                        f"    <span class='t3-name-text'>{name_text}</span>"
+                        f"    <span class='t3-name-memo'>{memo}</span>"
+                        f"</div>"
+                    )
+
                 html += (
                     "<tr class='t3-row'>"
                     f"<td class='name-cell{abs_class}'>"
-                    f"  <div class='student-inner{gap_class} t3-name-wrap'>"
-                    f"      <span class='t3-name-text'>{name_text}</span>"
-                    f"      <span class='t3-name-memo'>{memo}</span>"
-                    f"  </div>"
+                    f"{name_html}"
                     f"</td>"
                     f"<td><div class='student-inner{gap_class}'><div class='check-box'></div></div></td>"
                     f"<td><div class='student-inner{gap_class}'>&nbsp;</div></td>"
                     f"<td class='assign-cell'><div class='student-inner{gap_class}'>{letter}</div></td>"
                     "</tr>"
                 )
-
             elif t == "summary":
                 text = item.get("text", "")
                 show_teacher_note = item.get("show_teacher_note", False)
