@@ -343,7 +343,7 @@ def get_print_css(orientation: str = "세로") -> str:
         .table3-custom .t3-name-memo {{
             flex: 0 0 auto;
             max-width: 72px;
-            font-size: 8.5pt;
+            font-size: 7pt;
             color: #363636;
             text-align: left;
             white-space: nowrap;
