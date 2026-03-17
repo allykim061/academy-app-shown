@@ -17,7 +17,7 @@ from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_d
 from .backup import (
     save_attendance_for_date, load_attendance_for_date,
     save_teacher_notes_for_date, load_teacher_notes_for_date,
-    load_weekly_period_notes, save_weekly_period_notes,
+    save_weekly_period_notes, load_weekly_period_notes, 
 )
 
 def run_app():
@@ -142,26 +142,28 @@ def run_app():
                 unsafe_allow_html=True,
             )
 
-    # 탭 2
+     # 탭 2
     with tab_list[2]:
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
-            st.markdown("<div class='no-print'>", unsafe_allow_html=True)
 
-            top_col1, top_col2 = st.columns(2)
+            # 알림 메시지
+            if st.session_state.get("weekly_note_msg") == "apply":
+                st.success("인쇄에 반영되었습니다.")
+                st.session_state.pop("weekly_note_msg", None)
 
-            with top_col1:
-                m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
+            elif st.session_state.get("weekly_note_msg") == "save":
+                st.success("저장 완료, 인쇄에 반영됩니다")
+                st.session_state.pop("weekly_note_msg", None)
 
-            with top_col2:
-                selected_period = st.selectbox(
-                    "편집할 교시",
-                    [1, 2, 3],
-                    format_func=lambda x: f"{x}교시",
-                    key="weekly_selected_period"
-                )
+            if st.session_state.get("weekly_note_error"):
+                st.error(st.session_state["weekly_note_error"])
+                st.session_state.pop("weekly_note_error", None)
 
-            # 2번표 비고 저장값 로드
+            # 하단 표기
+            m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
+
+            # 교시별 비고 저장값 로드
             weekly_period_note_key = "weekly_period_notes"
             if weekly_period_note_key not in st.session_state:
                 try:
@@ -169,165 +171,95 @@ def run_app():
                 except Exception:
                     st.session_state[weekly_period_note_key] = {1: "", 2: "", 3: ""}
 
-            # 재원생만 사용
-            df_active = df[df[COL_STATUS] == "재원"].copy()
+            # 체크박스 / selectbox 기본값 보장
+            if "chk_show_period_notes_t2" not in st.session_state:
+                st.session_state["chk_show_period_notes_t2"] = True
 
-            grade_sort_map = {g: i for i, g in enumerate(GRADE_ORDER)}
-            df_active["_grade_order"] = df_active[COL_GRADE].map(grade_sort_map).fillna(999)
-            df_active = df_active.sort_values(["_grade_order", COL_SCHOOL, COL_NAME])
+            if "weekly_selected_period_note" not in st.session_state:
+                st.session_state["weekly_selected_period_note"] = 1
 
-            target_days = ["월", "화", "수", "목"]
+            # 현재 상태값 읽기
+            show_period_notes_t2 = st.session_state["chk_show_period_notes_t2"]
+            selected_period = st.session_state["weekly_selected_period_note"]
 
-            # 선택 교시의 요일별 학생 목록
-            slot_students = {}
-            for day in target_days:
-                condition = df_active.apply(
-                    lambda row: match_attendance(row[COL_DAYS], row[COL_PERIOD], day, selected_period),
-                    axis=1
-                )
-                slot_students[day] = df_active[condition].copy()
+            # 1) HTML 미리보기
+            st.markdown(
+                f"<div class='report-view'>{generate_table2(df, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div>",
+                unsafe_allow_html=True
+            )
 
-            def render_weekly_day_cell(container, df_slot: pd.DataFrame, day: str, period: int):
-                with container:
-                    if df_slot.empty:
-                        st.caption("—")
-                        return
+            # 2) 아래부터 입력 UI만 인쇄 제외
+            st.markdown("<div class='no-print'>", unsafe_allow_html=True)
 
-                    editor_rows = []
-                    last_grade = None
+            # 3) 한 줄 헤더: [비고 | 설명]   [비고칸 표시 | selectbox]
+            left_col, right_col = st.columns([3.8, 2.2], vertical_alignment="bottom")
 
-                    for _, row in df_slot.iterrows():
-                        school = str(row[COL_SCHOOL]).strip()
-                        grade = str(row[COL_GRADE]).strip()
-
-                        if last_grade is None or grade != last_grade:
-                            editor_rows.append({
-                                "이름": f"【{grade}】",
-                            })
-
-                        editor_rows.append({
-                            "이름": f"{row[COL_NAME]}({school})",
-                        })
-
-                        last_grade = grade
-
-                    df_editor = pd.DataFrame(editor_rows)
-                    dynamic_height = (len(df_editor) * 35) + 40
-
-                    st.data_editor(
-                        df_editor,
-                        height=dynamic_height,
-                        column_order=["이름"],
-                        column_config={
-                            "이름": st.column_config.TextColumn("이름", disabled=True, width="small"),
-                        },
-                        hide_index=True,
-                        key=f"weekly_view_{day}_{period}",
-                        use_container_width=True,
-                    )
-
-            with st.form(key=f"weekly_memo_form_{selected_period}", clear_on_submit=False):
-                header_cols = st.columns([0.65, 1.85, 1.85, 1.85, 1.85])
-                header_labels = ["수업시간", "월", "화", "수", "목"]
-                for col, label in zip(header_cols, header_labels):
-                    with col:
-                        st.markdown(
-                            f"""
-                            <div class="no-print" style="
-                                border:1px solid #dee2e6;
-                                background:#f8f9fa;
-                                padding:8px 6px;
-                                text-align:center;
-                                font-weight:600;
-                                font-size:13px;
-                                border-radius:6px;
-                                margin-bottom:6px;
-                            ">
-                                {label}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                row_cols = st.columns([0.65, 1.85, 1.85, 1.85, 1.85], vertical_alignment="top")
-
-                with row_cols[0]:
-                    st.markdown(
-                        f"""
-                        <div class="no-print" style="
-                            border:1px solid #dee2e6;
-                            background:#fafafa;
-                            padding:10px 6px;
-                            text-align:center;
-                            font-weight:600;
-                            font-size:13px;
-                            border-radius:6px;
-                        ">
-                            {selected_period}교시
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-
-                render_weekly_day_cell(row_cols[1], slot_students["월"], "월", selected_period)
-                render_weekly_day_cell(row_cols[2], slot_students["화"], "화", selected_period)
-                render_weekly_day_cell(row_cols[3], slot_students["수"], "수", selected_period)
-                render_weekly_day_cell(row_cols[4], slot_students["목"], "목", selected_period)
-
+            with left_col:
                 st.markdown(
                     """
-                    <div class="no-print" style="margin-top:14px; margin-bottom:6px; display:flex; align-items:baseline; gap:8px;">
+                    <div class="weekly-note-header no-print" style="margin-top:14px; margin-bottom:6px; display:flex; align-items:baseline; gap:8px;">
                         <div style="font-weight:600; font-size:13px;">비고</div>
-                        <div style="font-size:11px; color:#363636;">인쇄: 한 줄에 세로 11자, 가로 17자까지 입력 가능</div>
+                        <div style="font-size:11px; color:#363636;">한 줄에 12자정도씩 입력해주세요</div>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
 
+            with right_col:
+                chk_col, select_col = st.columns([1.15, 1.0], vertical_alignment="bottom")
+
+                with chk_col:
+                    st.checkbox("비고칸 표시", key="chk_show_period_notes_t2")
+
+                with select_col:
+                    st.selectbox(
+                        "교시 선택",
+                        [1, 2, 3],
+                        format_func=lambda x: f"{x}교시",
+                        key="weekly_selected_period_note",
+                        label_visibility="collapsed",
+                    )
+            # 최신 상태값 다시 읽기
+            show_period_notes_t2 = st.session_state["chk_show_period_notes_t2"]
+            selected_period = st.session_state["weekly_selected_period_note"]
+
+            # 4) 입력칸 + 버튼
+            with st.form(key="weekly_note_form", clear_on_submit=False):
                 note_val = st.text_area(
                     "",
                     value=st.session_state[weekly_period_note_key].get(selected_period, ""),
-                    key=f"weekly_period_note_{selected_period}",
-                    height=180,
+                    key=f"weekly_period_note_input_{selected_period}",
+                    height=260,
                     label_visibility="collapsed",
                 )
 
                 btn_apply, btn_save, btn_blank = st.columns([1, 1, 6])
 
                 with btn_apply:
-                    apply_weekly_memo_clicked = st.form_submit_button("적용", use_container_width=True)
+                    apply_clicked = st.form_submit_button("적용", use_container_width=True)
 
                 with btn_save:
-                    save_weekly_memo_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
+                    save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
 
-            if apply_weekly_memo_clicked or save_weekly_memo_clicked:
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            if apply_clicked or save_clicked:
                 merged_period_notes = dict(st.session_state[weekly_period_note_key])
                 merged_period_notes[selected_period] = str(note_val).strip()
                 st.session_state[weekly_period_note_key] = merged_period_notes
 
-                st.success("인쇄에 반영되었습니다.")
+                if save_clicked:
+                    try:
+                        save_weekly_period_notes(st.session_state[weekly_period_note_key])
+                        st.session_state["weekly_note_msg"] = "save"
+                    except Exception as e:
+                        st.session_state["weekly_note_error"] = f"저장 실패: {e}"
+                else:
+                    st.session_state["weekly_note_msg"] = "apply"
 
-            if save_weekly_memo_clicked:
-                try:
-                    save_weekly_period_notes(st.session_state[weekly_period_note_key])
-                    st.success("저장 완료, 인쇄에 반영됩니다")
-                except Exception as e:
-                    st.error(f"저장 실패: {e}")
-
-            st.markdown(
-                """
-                <div class="no-print">
-                    <h3 style="margin:0 0 8px 0;">🖨️ 미리보기</h3>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{generate_table2(df, m2, period_notes=st.session_state[weekly_period_note_key])}</div></div>",
-                unsafe_allow_html=True
-            )
-
-    # 탭 3
+                st.rerun()
+                
+     # 탭 3
     with tab_list[3]:
         st.markdown(print_banner, unsafe_allow_html=True)
 

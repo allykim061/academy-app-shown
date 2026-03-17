@@ -140,13 +140,12 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
     html += f"<tr><th>합계</th><td class='t1-names t1-summary'>{summary_final_str}</td><td>{total}</td></tr></tbody></table>"
     return html
 
-
 def generate_table2(
     df: pd.DataFrame,
     month_text: str,
     period_notes: dict[int, str] | None = None,
+    show_period_notes: bool = True,
 ) -> str:
-    # slot_memos는 호출부 호환성을 위해 잠시 남겨둠
     if period_notes is None:
         period_notes = {}
 
@@ -222,7 +221,7 @@ def generate_table2(
                 f"{''.join(student_list)}{count_html}</td>"
             )
 
-        period_note = str(period_notes.get(p, "")).strip()
+        period_note = str(period_notes.get(p, "")).strip() if show_period_notes else ""
         note_html = (
             f"<div class='weekly-note-cell'>{period_note}</div>"
             if period_note else ""
@@ -232,7 +231,6 @@ def generate_table2(
         html += f"</tr></tbody></table><div class='date-footer'>{month_text}</div></div>"
 
     return html
-
 
 def generate_table3(
     df: pd.DataFrame,

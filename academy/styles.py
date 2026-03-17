@@ -7,6 +7,7 @@ def get_print_css(orientation: str = "세로") -> str:
     # 인쇄 페이지 여백
     page_margin_top = "3mm"
     page_margin_lr  = "5mm"
+    note_height = "950px" if orientation == "세로" else "660px"
 
     return f"""
     <style>
@@ -28,6 +29,11 @@ def get_print_css(orientation: str = "세로") -> str:
               "Apple SD Gothic Neo",
               "Noto Sans KR",
               sans-serif !important;
+        }}
+
+        div[data-testid="stTextArea"] textarea {{
+            font-size: 14px !important;
+            line-height: 1.4 !important;
         }}
 
         /* =========================================================
@@ -214,12 +220,17 @@ def get_print_css(orientation: str = "세로") -> str:
         }}
 
         .weekly-note-cell {{
-            font-size: 8.5pt;
+            font-size: 8pt;
             line-height: 1.3;
             white-space: pre-wrap;
             word-break: keep-all;
             overflow-wrap: break-word;
             text-align: left;
+
+            min-height: {note_height};
+            max-height: {note_height};
+            overflow: hidden;
+            box-sizing: border-box;
         }}
 
         .weekly-count {{
@@ -549,6 +560,10 @@ def get_print_css(orientation: str = "세로") -> str:
                 margin-left: 0 !important;
                 box-sizing: border-box !important;
                 table-layout: fixed !important;
+            }}
+
+            .weekly-note-header{{
+                display:none !important;
             }}
 
             /* -----------------------------------------------------

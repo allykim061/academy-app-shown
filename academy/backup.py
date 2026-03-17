@@ -98,7 +98,6 @@ def serialize_day_store(date_key: str, day_store: DayStore, batch_id: str) -> li
         letter = sanitize_letter(data.get("letter", ""))
         absent = bool(data.get("absent", False))
 
-        # 완전히 빈 값은 저장하지 않음
         if not letter and not absent:
             continue
 
