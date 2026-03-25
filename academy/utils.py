@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from datetime import date
 
 import pandas as pd
+import html
 
 from .config import (
     COL_ID, COL_NAME, COL_SCHOOL, COL_GRADE,
@@ -111,3 +112,23 @@ def sanitize_letter(v: str) -> str:
         return ""
     ch = s[0]
     return ch if ("A" <= ch <= "Z") else ""
+
+def safe_html_text(value: object) -> str:
+    # 진짜 결측치만 빈칸 처리
+    if value is None or pd.isna(value):
+        return ""
+
+    s = str(value).strip()
+    if s == "":
+        return ""
+
+    # HTML 특수문자 방어
+    s = html.escape(s, quote=True)
+
+    # 마크다운/렌더링 충돌 방어: 엔티티 대신 실제 유니코드 문자 사용
+    s = s.replace("~", "～")
+    s = s.replace("*", "∗")
+    s = s.replace("_", "＿")
+    s = s.replace("#", "＃")
+
+    return s

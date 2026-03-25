@@ -1,13 +1,78 @@
 # academy/styles.py
 import streamlit as st
 
+
 def get_print_css(orientation: str = "세로") -> str:
     page_size = "A4 portrait" if orientation == "세로" else "A4 landscape"
 
     # 인쇄 페이지 여백
     page_margin_top = "3mm"
-    page_margin_lr  = "5mm"
+    page_margin_lr = "5mm"
     note_height = "950px" if orientation == "세로" else "660px"
+
+    # 2번표: 한 줄형 메모만 가로/세로 분기
+    if orientation == "세로":
+        weekly_name_inline_css = """
+        .weekly-name-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 2px;
+            width: 100%;
+        }
+
+        .weekly-name-text {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .weekly-name-memo {
+            flex: 0 0 auto;
+            width: 56px;
+            min-width: 56px;
+            font-size: 7pt;
+            line-height: 1.15;
+            color: #2563eb;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            padding-right: 3px;
+            box-sizing: border-box;
+        }
+        """
+    else:
+        weekly_name_inline_css = """
+        .weekly-name-wrap {
+            display: flex;
+            justify-content: flex-start;
+            align-items: baseline;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .weekly-name-text {
+            flex: 0 1 auto;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .weekly-name-memo {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 0;
+            font-size: 7pt;
+            line-height: 1.15;
+            color: #2563eb;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: clip;
+            padding-right: 0;
+            box-sizing: border-box;
+        }
+        """
 
     return f"""
     <style>
@@ -127,19 +192,6 @@ def get_print_css(orientation: str = "세로") -> str:
         }}
 
         /* =========================================================
-           2번표(주간표) 화면용 이름
-           ========================================================= */
-        .weekly-name {{
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            font-size: 8pt;
-            letter-spacing: -0.6px;
-            margin-bottom: 5px;
-            line-height: 1;
-        }}
-
-        /* =========================================================
            1번표 / 4번표
            ========================================================= */
         .table1-custom {{
@@ -191,42 +243,40 @@ def get_print_css(orientation: str = "세로") -> str:
             font-weight: bold !important;
         }}
 
-        .weekly-name-wrap {{
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 2px;
-            width: 100%;
-        }}
+        {weekly_name_inline_css}
 
-        .weekly-name-text {{
-            flex: 1 1 auto;
-            min-width: 0;
-            overflow: hidden;
-        }}
-
-        .weekly-name-memo {{
-            flex: 0 0 auto;
-            width: 56px;
-            min-width: 56px;
-            font-size: 7pt;
-            line-height: 1.15;
-            color: #2563eb;
-            text-align: right;
+        .weekly-name {{
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: clip;
-            padding-right: 3px;
-            box-sizing: border-box;
+            text-overflow: ellipsis;
+            font-size: 8pt;
+            letter-spacing: -0.6px;
+            margin-bottom: 5px;
+            line-height: 1;
         }}
+
+        /* 긴 메모(아래형)는 공통 유지 */
 
         .weekly-name-wrap-vertical {{
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            justify-content: center;
-            gap: 1px;
+            justify-content: flex-start;
+            gap: 0;
             width: 100%;
+            overflow: visible !important;
+        }}
+
+        .weekly-name-wrap-vertical .weekly-name-text {{
+            display: block;
+            flex: none !important;
+            min-width: auto !important;
+            overflow: visible !important;
+            white-space: nowrap;
+            text-overflow: clip !important;
+            font-size: 8pt;
+            letter-spacing: -0.6px;
+            line-height: 1.05;
         }}
 
         .weekly-name-memo-below {{
@@ -235,11 +285,11 @@ def get_print_css(orientation: str = "세로") -> str:
             min-width: 0;
             max-width: 100%;
             font-size: 6.5pt;
-            line-height: 1.1;
+            line-height: 1.0;
             color: #2563eb;
             text-align: left;
             white-space: nowrap;
-            overflow: hidden;
+            overflow: visible !important;
             padding-right: 0;
             box-sizing: border-box;
         }}
@@ -475,7 +525,7 @@ def get_print_css(orientation: str = "세로") -> str:
             [data-testid="stForm"] {{
                 display: none !important;
             }}
-            
+
             /* -----------------------------------------------------
                2) 0번표(전체 목록) 인쇄 시 유령 공간 제거
                ----------------------------------------------------- */
@@ -605,8 +655,8 @@ def get_print_css(orientation: str = "세로") -> str:
                 table-layout: fixed !important;
             }}
 
-            .weekly-note-header{{
-                display:none !important;
+            .weekly-note-header {{
+                display: none !important;
             }}
 
             /* -----------------------------------------------------

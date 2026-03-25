@@ -6,7 +6,10 @@ from .config import (
     COL_STUDENT_MEMO,
     GRADE_ORDER, WEEKDAY_ORDER
 )
-from .utils import split_days, extract_period_numbers, match_attendance, get_student_key, sanitize_letter
+from .utils import (
+    split_days, extract_period_numbers, match_attendance,
+    get_student_key, sanitize_letter, safe_html_text
+)
 from .filters import filter_students_for_day_period
 
 GRADE_SORT_MAP = {str(g).strip(): i for i, g in enumerate(GRADE_ORDER)}
@@ -37,11 +40,12 @@ def format_grouped_names(
     formatted_groups = []
 
     for key, sub_group in group_df.groupby(key_col, sort=False):
-        names_list = sub_group[name_col].tolist()
+        names_list = [safe_html_text(x) for x in sub_group[name_col].tolist()]
         names_str = " ".join(names_list)
         count = len(names_list)
 
-        key_text = key_wrapper(key) if show_key else ""
+        safe_key = safe_html_text(key)
+        key_text = key_wrapper(safe_key) if show_key else ""
         count_text = f" {count}명" if (show_count and count >= 4) else ""
 
         if count == 1:
@@ -55,7 +59,14 @@ def format_grouped_names(
 def generate_total_list_html(df: pd.DataFrame) -> str:
     html = "<table class='total-list-table' style='width:100%;'><thead><tr>"
     cols = [COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS]
-    widths = {COL_NAME: "15%", COL_SCHOOL: "25%", COL_GRADE: "10%", COL_DAYS: "20%", COL_PERIOD: "20%", COL_STATUS: "10%"}
+    widths = {
+        COL_NAME: "15%",
+        COL_SCHOOL: "25%",
+        COL_GRADE: "10%",
+        COL_DAYS: "20%",
+        COL_PERIOD: "20%",
+        COL_STATUS: "10%"
+    }
 
     for c in cols:
         w = widths.get(c, "15%")
@@ -65,7 +76,8 @@ def generate_total_list_html(df: pd.DataFrame) -> str:
     for r in df.to_dict("records"):
         html += "<tr>"
         for c in cols:
-            html += f"<td>{r[c]}</td>"
+            safe_cell = safe_html_text(r[c])
+            html += f"<td>{safe_cell}</td>"
         html += "</tr>"
     html += "</tbody></table>"
     return html
@@ -73,8 +85,9 @@ def generate_total_list_html(df: pd.DataFrame) -> str:
 
 def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month_text: str) -> str:
     df_active = df[df[COL_STATUS] == "재원"].copy()
-    html = f"<h2 style='text-align:center; font-size:16pt;'>학년별 명단 ({month_text})</h2>"
-    
+    safe_month_text = safe_html_text(month_text)
+    html = f"<h2 style='text-align:center; font-size:16pt;'>학년별 명단 ({safe_month_text})</h2>"
+
     html += "<table class='table1-custom'><thead><tr><th>학년</th><th>학생 명단</th><th>인원수</th></tr></thead><tbody>"
 
     total = 0
@@ -96,7 +109,7 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
                 spacer="&nbsp;&nbsp;&nbsp;&nbsp;"
             )
         else:
-            names_final_str = " ".join(group_sorted[COL_NAME].tolist())
+            names_final_str = " ".join([safe_html_text(x) for x in group_sorted[COL_NAME].tolist()])
 
         html += f"<tr><th>{grade}</th><td class='t1-names'>{names_final_str}</td><td>{len(group)}</td></tr>"
         total += len(group)
@@ -122,7 +135,7 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
         else:
             groups = []
             for _, school_group in df_target.groupby(COL_SCHOOL, sort=False):
-                groups.append(" ".join(school_group[COL_NAME].tolist()))
+                groups.append(" ".join([safe_html_text(x) for x in school_group[COL_NAME].tolist()]))
             body = " ".join(groups)
 
         return f"<div class='t1-summary-line'><strong>{label}:</strong> {body}</div>"
@@ -136,9 +149,10 @@ def generate_table1(df: pd.DataFrame, show_school: bool, show_count: bool, month
         summary_texts.append(str_3day)
 
     summary_final_str = "".join(summary_texts)
-    
+
     html += f"<tr><th>합계</th><td class='t1-names t1-summary'>{summary_final_str}</td><td>{total}</td></tr></tbody></table>"
     return html
+
 
 def generate_table2(
     df: pd.DataFrame,
@@ -149,8 +163,10 @@ def generate_table2(
     if period_notes is None:
         period_notes = {}
 
+    safe_month_text = safe_html_text(month_text)
+
     df_active = df[df[COL_STATUS] == "재원"].copy()
-    html = f"<h2 class='no-print' style='text-align:center; font-size:16pt;'>{month_text} 반편성 내역</h2>"
+    html = f"<h2 class='no-print' style='text-align:center; font-size:16pt;'>{safe_month_text} 반편성 내역</h2>"
     target_days = ["월", "화", "수", "목"]
 
     periods_set = set()
@@ -194,26 +210,32 @@ def generate_table2(
                     s_str, g_str = str(r[COL_SCHOOL]).strip(), grade
                     school_grade = s_str + (g_str[1:] if s_str and g_str and s_str[-1] == g_str[0] else g_str)
 
-                    memo = str(r.get(COL_STUDENT_MEMO, "")).strip()
+                    raw_name = str(r[COL_NAME]).strip()
+                    safe_name = safe_html_text(raw_name)
+                    safe_school_grade = safe_html_text(school_grade)
 
-                    if memo and len(memo) >= 6:
+                    raw_memo = str(r.get(COL_STUDENT_MEMO, "")).strip()
+                    safe_memo = safe_html_text(raw_memo)
+
+                    if raw_memo and len(raw_memo) >= 6:
                         student_html = (
-                            "<div class='weekly-name weekly-name-wrap weekly-name-wrap-vertical' style='text-align:left;'>"
-                            f"<span class='weekly-name-text'>{r[COL_NAME]} ({school_grade})</span>"
-                            f"<span class='weekly-name-memo weekly-name-memo-below'>{memo}</span>"
+                            "<div class='weekly-name-wrap weekly-name-wrap-vertical' style='text-align:left;'>"
+                            f"<span class='weekly-name-text'>{safe_name} ({safe_school_grade})</span>"
+                            f"<span class='weekly-name-memo weekly-name-memo-below'>{safe_memo}</span>"
                             "</div>"
                         )
-                    elif memo:
+                    elif raw_memo:
                         student_html = (
                             "<div class='weekly-name weekly-name-wrap' style='text-align:left;'>"
-                            f"<span class='weekly-name-text'>{r[COL_NAME]} ({school_grade})</span>"
-                            f"<span class='weekly-name-memo'>{memo}</span>"
+                            f"<span class='weekly-name-text'>{safe_name} ({safe_school_grade})</span>"
+                            f"<span class='weekly-name-memo'>{safe_memo}</span>"
                             "</div>"
                         )
                     else:
                         student_html = (
-                            f"<div class='weekly-name' style='text-align:left;'>{r[COL_NAME]} ({school_grade})</div>"
+                            f"<div class='weekly-name' style='text-align:left;'>{safe_name} ({safe_school_grade})</div>"
                         )
+
                     student_list.append(student_html)
                     last_grade = grade
 
@@ -227,16 +249,19 @@ def generate_table2(
                 f"{''.join(student_list)}{count_html}</td>"
             )
 
-        period_note = str(period_notes.get(p, "")).strip() if show_period_notes else ""
+        raw_period_note = str(period_notes.get(p, "")).strip() if show_period_notes else ""
+        safe_period_note = safe_html_text(raw_period_note)
+
         note_html = (
-            f"<div class='weekly-note-cell'>{period_note}</div>"
-            if period_note else ""
+            f"<div class='weekly-note-cell'>{safe_period_note}</div>"
+            if safe_period_note else ""
         )
 
         html += f"<td style='text-align:left !important;'>{note_html}</td>"
-        html += f"</tr></tbody></table><div class='date-footer'>{month_text}</div></div>"
+        html += f"</tr></tbody></table><div class='date-footer'>{safe_month_text}</div></div>"
 
     return html
+
 
 def generate_table3(
     df: pd.DataFrame,
@@ -290,7 +315,9 @@ def generate_table3(
             pause = " (휴)" if row[COL_STATUS] == "휴원" else ""
             s_str = str(row[COL_SCHOOL]).strip()
             school_grade = s_str + (grade[1:] if s_str and grade and s_str[-1] == grade[0] else grade)
-            name_text = f"{row[COL_NAME]} ({school_grade}){pause}"
+
+            raw_name_text = f"{row[COL_NAME]} ({school_grade}){pause}"
+            safe_name_text = safe_html_text(raw_name_text)
 
             skey = get_student_key(row)
             akey = (p, skey)
@@ -301,7 +328,9 @@ def generate_table3(
 
             letter = sanitize_letter(data.get("letter", ""))
             is_abs = bool(data.get("absent", False))
-            memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
+
+            raw_memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
+            safe_memo = safe_html_text(raw_memo)
 
             if is_abs:
                 p_absent += 1
@@ -312,9 +341,10 @@ def generate_table3(
 
             rows[p].append({
                 "type": "student",
-                "name_text": name_text,
+                "name_text": safe_name_text,
                 "letter": letter,
-                "memo": memo,
+                "memo": safe_memo,
+                "raw_memo_len": len(raw_memo),
                 "is_abs": is_abs,
                 "is_new_grade": is_new_grade,
             })
@@ -373,8 +403,9 @@ def generate_table3(
                 name_text = item.get("name_text", "")
                 letter = item.get("letter", "")
                 memo = item.get("memo", "")
+                memo_len = item.get("raw_memo_len", 0)
 
-                if memo and len(memo) >= 7:
+                if memo and memo_len >= 7:
                     name_html = (
                         f"<div class='student-inner{gap_class} t3-name-wrap t3-name-wrap-vertical'>"
                         f"    <span class='t3-name-text'>{name_text}</span>"
@@ -399,18 +430,20 @@ def generate_table3(
                     f"<td class='assign-cell'><div class='student-inner{gap_class}'>{letter}</div></td>"
                     "</tr>"
                 )
+
             elif t == "summary":
                 text = item.get("text", "")
                 show_teacher_note = item.get("show_teacher_note", False)
-                teacher_note = str(item.get("teacher_note", "")).strip()
+                raw_teacher_note = str(item.get("teacher_note", "")).strip()
+                safe_teacher_note = safe_html_text(raw_teacher_note)
 
-                if show_teacher_note and teacher_note:
+                if show_teacher_note and safe_teacher_note:
                     html += (
                         "<tr class='t3-row'>"
                         "<td class='summary-cell'>"
                         "  <div class='t3-summary-wrap'>"
                         f"      <div class='t3-summary-text'>{text}</div>"
-                        f"      <div class='t3-summary-memo'>{teacher_note}</div>"
+                        f"      <div class='t3-summary-memo'>{safe_teacher_note}</div>"
                         "  </div>"
                         "</td>"
                         "<td></td><td></td><td></td>"
@@ -455,18 +488,19 @@ def generate_table3(
 
     html += "</div>"
     return html
-    
+
 
 def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
     df_active = df[df[COL_STATUS] == "재원"].copy()
-    
+
     unique_schools = df_active[COL_SCHOOL].dropna().unique().tolist()
     unique_schools.sort(key=lambda x: (get_school_rank(x), str(x)))
 
-    html = f"<h2 style='text-align:center; font-size:16pt;'>학교별 명단 ({month_text})</h2>"
-    
+    safe_month_text = safe_html_text(month_text)
+    html = f"<h2 style='text-align:center; font-size:16pt;'>학교별 명단 ({safe_month_text})</h2>"
+
     html += "<table class='table1-custom table4-custom'><thead><tr><th>학교</th><th>학생 명단</th><th>인원수</th></tr></thead><tbody>"
-    
+
     total = 0
     for school in unique_schools:
         group = df_active[df_active[COL_SCHOOL] == school].copy()
@@ -488,11 +522,12 @@ def generate_table4(df: pd.DataFrame, show_grade: bool, month_text: str) -> str:
                 spacer="&nbsp;&nbsp;&nbsp;&nbsp;"
             )
         else:
-            names_final_str = " ".join(group_sorted[COL_NAME].tolist())
+            names_final_str = " ".join([safe_html_text(x) for x in group_sorted[COL_NAME].tolist()])
 
-        html += f"<tr><th>{school}</th><td class='t1-names'>{names_final_str}</td><td>{len(group)}</td></tr>"
+        safe_school = safe_html_text(school)
+        html += f"<tr><th>{safe_school}</th><td class='t1-names'>{names_final_str}</td><td>{len(group)}</td></tr>"
         total += len(group)
 
     html += f"<tr><th>합계</th><td class='t1-names'></td><td>{total}</td></tr></tbody></table>"
-    
+
     return html
