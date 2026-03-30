@@ -4,6 +4,7 @@ import pandas as pd
 
 from .config import (
     COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS,
+    COL_STUDENT_MEMO,
     GRADE_ORDER, WEEKDAY_ORDER
 )
 from .data import load_data
@@ -436,9 +437,13 @@ def run_app():
                             grade = str(row[COL_GRADE]).strip()
                             school_grade = school + (grade[1:] if school and grade and school[-1] == grade[0] else grade)
 
+                            student_memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
+                            memo_preview = student_memo if len(student_memo) <= 6 else student_memo[:6] + "…"
+
                             editor_data.append({
                                 "_skey": skey,
                                 "이름": f"{row[COL_NAME]} ({school_grade})",
+                                "메모": memo_preview,
                                 "배정": c_let,
                                 "결석": c_abs,
                             })
@@ -449,12 +454,13 @@ def run_app():
                         edited_df = st.data_editor(
                             df_editor,
                             height=dynamic_height,
-                            column_order=["이름", "배정", "결석"],
+                            column_order=["이름", "메모", "배정", "결석"],
                             column_config={
                                 "_skey": None,
                                 "이름": st.column_config.TextColumn("이름", disabled=True),
-                                "배정": st.column_config.TextColumn("배정", max_chars=1),
-                                "결석": st.column_config.CheckboxColumn("결석"),
+                                "메모": st.column_config.TextColumn("메모", disabled=True, width="small"),
+                                "배정": st.column_config.TextColumn("배정", max_chars=1, width="small"),
+                                "결석": st.column_config.CheckboxColumn("결석", width="small"),
                             },
                             hide_index=True,
                             key=f"editor_{date_key}_{p}_{editor_version}",
