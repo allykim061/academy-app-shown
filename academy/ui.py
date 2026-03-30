@@ -18,7 +18,7 @@ from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_d
 from .backup import (
     save_attendance_for_date, load_attendance_for_date,
     save_teacher_notes_for_date, load_teacher_notes_for_date,
-    save_weekly_period_notes, load_weekly_period_notes, 
+    save_weekly_period_notes, load_weekly_period_notes,
 )
 
 def run_app():
@@ -49,7 +49,7 @@ def run_app():
 
     tab_list = st.tabs(["전체 목록", "학년별 명단", "수업시간 명단", "출석부", "학교별 명단"])
 
-   # 탭 0
+    # 탭 0
     with tab_list[0]:
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
@@ -148,7 +148,7 @@ def run_app():
                 unsafe_allow_html=True,
             )
 
-     # 탭 2
+    # 탭 2
     with tab_list[2]:
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
@@ -225,6 +225,7 @@ def run_app():
                         key="weekly_selected_period_note",
                         label_visibility="collapsed",
                     )
+
             # 최신 상태값 다시 읽기
             show_period_notes_t2 = st.session_state["chk_show_period_notes_t2"]
             selected_period = st.session_state["weekly_selected_period_note"]
@@ -264,7 +265,7 @@ def run_app():
                     st.session_state["weekly_note_msg"] = "apply"
 
                 st.rerun()
-                
+
     # 탭 3
     with tab_list[3]:
         st.markdown(print_banner, unsafe_allow_html=True)
@@ -398,10 +399,73 @@ def run_app():
                     "letters": dict(sorted(letters.items()))
                 }
 
+            summary_data = st.session_state.get(summary_key, {})
+            if summary_data:
+                st.markdown(
+                    """
+                    <div class="no-print" style="margin-top:18px; margin-bottom:10px;">
+                        <h4 style="margin:0 0 8px 0; font-size:14px;">교시별 합계</h4>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                sc1, sc2, sc3 = st.columns(3)
+
+                def render_summary_card(col, p):
+                    with col:
+                        data = summary_data.get(p, {"total": 0, "absent": 0, "letters": {}})
+                        lines = [f"인원 | {data['total']}명"]
+
+                        for letter, count in data["letters"].items():
+                            lines.append(f"{letter} | {count}명")
+
+                        lines.append(f"결석 | {data['absent']}명")
+
+                        body = "<br>".join(lines)
+
+                        st.markdown(
+                            f"""
+                            <div class="no-print" style="
+                                border:1px solid #dee2e6;
+                                border-radius:8px;
+                                background:#f8f9fa;
+                                padding:10px 12px;
+                                margin-bottom:10px;
+                                font-size:13px;
+                                line-height:1.7;
+                            ">
+                                <div style="font-weight:600; margin-bottom:6px;">{p}교시 합계</div>
+                                <div>{body}</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                render_summary_card(sc1, 1)
+                render_summary_card(sc2, 2)
+                render_summary_card(sc3, 3)
+
             with st.form(key=f"assign_form_{date_key}_{editor_version}", clear_on_submit=False):
                 has_p1 = not per_period_students.get(1, pd.DataFrame()).empty
                 has_p2 = not per_period_students.get(2, pd.DataFrame()).empty
                 has_p3 = not per_period_students.get(3, pd.DataFrame()).empty
+
+                btn_summary, btn_apply, btn_save, btn_reset, btn_blank = st.columns([1.2, 1, 1, 1, 6.8])
+
+                with btn_summary:
+                    summary_clicked = st.form_submit_button("합계", use_container_width=True)
+
+                with btn_apply:
+                    apply_clicked = st.form_submit_button("적용", use_container_width=True)
+
+                with btn_save:
+                    save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
+
+                with btn_reset:
+                    reset_clicked = st.form_submit_button("초기화", use_container_width=True)
+
+                st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
                 if has_p1 and has_p2 and not has_p3:
                     ec1, ec2, ec3 = st.columns([1, 1, 0.35])
@@ -411,6 +475,7 @@ def run_app():
                     ec1, ec2, ec3 = st.columns([0.35, 1, 1])
                 else:
                     ec1, ec2, ec3 = st.columns(3)
+
                 edited_dfs = {}
 
                 def render_data_editor(col, p):
@@ -510,20 +575,6 @@ def run_app():
                         key=f"teacher_note_3_{date_key}_{editor_version}",
                     )
 
-                btn_summary, btn_apply, btn_save, btn_reset, btn_blank = st.columns([1.2, 1, 1, 1, 6.8])
-
-                with btn_summary:
-                    summary_clicked = st.form_submit_button("합계", use_container_width=True)
-
-                with btn_apply:
-                    apply_clicked = st.form_submit_button("적용", use_container_width=True)
-
-                with btn_save:
-                    save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
-
-                with btn_reset:
-                    reset_clicked = st.form_submit_button("초기화", use_container_width=True)
-
             if reset_clicked:
                 st.session_state["assignments"][date_key] = {}
                 st.session_state[summary_key] = {}
@@ -559,53 +610,6 @@ def run_app():
                     df_edited = edited_dfs.get(p)
                     summary_result[p] = build_period_summary(df_edited)
                 st.session_state[summary_key] = summary_result
-
-            summary_data = st.session_state.get(summary_key, {})
-            if summary_data:
-                st.markdown(
-                    """
-                    <div class="no-print" style="margin-top:18px; margin-bottom:10px;">
-                        <h4 style="margin:0 0 8px 0; font-size:14px;">교시별 합계</h4>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                sc1, sc2, sc3 = st.columns(3)
-
-                def render_summary_card(col, p):
-                    with col:
-                        data = summary_data.get(p, {"total": 0, "absent": 0, "letters": {}})
-                        lines = [f"인원 | {data['total']}명"]
-
-                        for letter, count in data["letters"].items():
-                            lines.append(f"{letter} | {count}명")
-
-                        lines.append(f"결석 | {data['absent']}명")
-
-                        body = "<br>".join(lines)
-
-                        st.markdown(
-                            f"""
-                            <div class="no-print" style="
-                                border:1px solid #dee2e6;
-                                border-radius:8px;
-                                background:#f8f9fa;
-                                padding:10px 12px;
-                                margin-bottom:10px;
-                                font-size:13px;
-                                line-height:1.7;
-                            ">
-                                <div style="font-weight:600; margin-bottom:6px;">{p}교시 합계</div>
-                                <div>{body}</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                render_summary_card(sc1, 1)
-                render_summary_card(sc2, 2)
-                render_summary_card(sc3, 3)
 
             if apply_clicked or save_clicked:
                 st.session_state[teacher_note_key] = {
@@ -661,6 +665,7 @@ def run_app():
                 """,
                 unsafe_allow_html=True
             )
+
     # 탭 4
     with tab_list[4]:
         st.markdown(print_banner, unsafe_allow_html=True)
