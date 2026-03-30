@@ -451,20 +451,16 @@ def run_app():
                 has_p2 = not per_period_students.get(2, pd.DataFrame()).empty
                 has_p3 = not per_period_students.get(3, pd.DataFrame()).empty
 
-                btn_summary, btn_apply, btn_save, btn_reset, btn_blank = st.columns([1.2, 1, 1, 1, 6.8])
+                btn_summary, btn_save, btn_blank = st.columns([1.2, 1.2, 8.6])
 
                 with btn_summary:
                     summary_clicked = st.form_submit_button("합계", use_container_width=True)
 
-                with btn_apply:
-                    apply_clicked = st.form_submit_button("적용", use_container_width=True)
-
                 with btn_save:
                     save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
 
-                with btn_reset:
-                    reset_clicked = st.form_submit_button("초기화", use_container_width=True)
-
+                apply_clicked = False
+                reset_clicked = False
                 st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
                 if has_p1 and has_p2 and not has_p3:
@@ -575,13 +571,6 @@ def run_app():
                         key=f"teacher_note_3_{date_key}_{editor_version}",
                     )
 
-            if reset_clicked:
-                st.session_state["assignments"][date_key] = {}
-                st.session_state[summary_key] = {}
-                st.session_state[teacher_note_key] = {1: "", 2: "", 3: ""}
-                st.session_state[editor_version_key] += 1
-                st.rerun()
-
             if summary_clicked:
                 summary_result = {}
                 for p in [1, 2, 3]:
@@ -589,7 +578,7 @@ def run_app():
                     summary_result[p] = build_period_summary(df_edited)
                 st.session_state[summary_key] = summary_result
 
-            if apply_clicked or save_clicked:
+            if save_clicked:
                 for p in [1, 2, 3]:
                     df_edited = edited_dfs.get(p)
                     if df_edited is not None and not df_edited.empty:
@@ -611,7 +600,7 @@ def run_app():
                     summary_result[p] = build_period_summary(df_edited)
                 st.session_state[summary_key] = summary_result
 
-            if apply_clicked or save_clicked:
+            if save_clicked:
                 st.session_state[teacher_note_key] = {
                     1: str(note_1).strip(),
                     2: str(note_2).strip(),
