@@ -499,12 +499,11 @@ def run_app():
                             school_grade = school + (grade[1:] if school and grade and school[-1] == grade[0] else grade)
 
                             student_memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
-                            memo_preview = student_memo if len(student_memo) <= 6 else student_memo[:6] + "…"
 
                             editor_data.append({
                                 "_skey": skey,
                                 "이름": f"{row[COL_NAME]} ({school_grade})",
-                                "메모": memo_preview,
+                                "메모": student_memo,
                                 "배정": c_let,
                                 "결석": c_abs,
                             })
@@ -521,7 +520,7 @@ def run_app():
                                 "이름": st.column_config.TextColumn("이름", disabled=True),
                                 "메모": st.column_config.TextColumn("메모", disabled=True, width="small"),
                                 "배정": st.column_config.TextColumn("배정", max_chars=1, width="small"),
-                                "결석": st.column_config.CheckboxColumn("결석", width="small"),
+                                "결석": st.column_config.CheckboxColumn("결석"),
                             },
                             hide_index=True,
                             key=f"editor_{date_key}_{p}_{editor_version}",
