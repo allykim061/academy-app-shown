@@ -322,15 +322,12 @@ def generate_table3(
             skey = get_student_key(row)
             akey = (p, skey)
 
-            data = assignment_map.get(akey, {"letter": "", "absent": False, "memo": ""})
+            data = assignment_map.get(akey, {"letter": "", "absent": False})
             if not isinstance(data, dict):
-                data = {"letter": sanitize_letter(str(data)), "absent": False, "memo": ""}
+                data = {"letter": sanitize_letter(str(data)), "absent": False}
 
             letter = sanitize_letter(data.get("letter", ""))
             is_abs = bool(data.get("absent", False))
-
-            raw_memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
-            safe_memo = safe_html_text(raw_memo)
 
             if is_abs:
                 p_absent += 1
@@ -343,8 +340,6 @@ def generate_table3(
                 "type": "student",
                 "name_text": safe_name_text,
                 "letter": letter,
-                "memo": safe_memo,
-                "raw_memo_len": len(raw_memo),
                 "is_abs": is_abs,
                 "is_new_grade": is_new_grade,
             })
@@ -402,23 +397,12 @@ def generate_table3(
                 gap_class = " new-grade-gap" if item.get("is_new_grade") else ""
                 name_text = item.get("name_text", "")
                 letter = item.get("letter", "")
-                memo = item.get("memo", "")
-                memo_len = item.get("raw_memo_len", 0)
 
-                if memo and memo_len >= 7:
-                    name_html = (
-                        f"<div class='student-inner{gap_class} t3-name-wrap t3-name-wrap-vertical'>"
-                        f"    <span class='t3-name-text'>{name_text}</span>"
-                        f"    <span class='t3-name-memo t3-name-memo-below'>{memo}</span>"
-                        f"</div>"
-                    )
-                else:
-                    name_html = (
-                        f"<div class='student-inner{gap_class} t3-name-wrap'>"
-                        f"    <span class='t3-name-text'>{name_text}</span>"
-                        f"    <span class='t3-name-memo'>{memo}</span>"
-                        f"</div>"
-                    )
+                name_html = (
+                    f"<div class='student-inner{gap_class}'>"
+                    f"{name_text}"
+                    f"</div>"
+                )
 
                 html += (
                     "<tr class='t3-row'>"
