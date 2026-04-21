@@ -7,10 +7,10 @@ from google.oauth2.service_account import Credentials
 from .config import (
     SCOPE, WORKSHEET_STUDENTS,
     REQUIRED_COLUMNS,
-    COL_PERIOD, COL_STATUS, COL_DAYS,
+    COL_SCHOOL, COL_PERIOD, COL_STATUS, COL_DAYS,
     COL_STUDENT_MEMO,
 )
-from .utils import norm
+from .utils import norm, normalize_school_name
 from .filters import norm_series
 
 @st.cache_data(ttl=300, show_spinner="loading...")
@@ -43,10 +43,12 @@ def load_data() -> pd.DataFrame:
             df[COL_STUDENT_MEMO] = ""
 
         # 4) 주요 문자열 컬럼 정규화
+        df[COL_SCHOOL] = df[COL_SCHOOL].apply(normalize_school_name)
         df[COL_PERIOD] = norm_series(df[COL_PERIOD])
         df[COL_DAYS] = norm_series(df[COL_DAYS])
         df[COL_STATUS] = df[COL_STATUS].astype(str).apply(norm)
         df[COL_STUDENT_MEMO] = df[COL_STUDENT_MEMO].fillna("").astype(str).str.strip()
+
 
         return df
 

@@ -113,6 +113,10 @@ def sanitize_letter(v: str) -> str:
     ch = s[0]
     return ch if ("A" <= ch <= "Z") else ""
 
+def normalize_school_name(value: object) -> str:
+    """학교명 전용 정규화: 숨은 공백 포함 모든 공백 제거"""
+    return norm(value)
+
 def safe_html_text(value: object) -> str:
     # 진짜 결측치만 빈칸 처리
     if value is None or pd.isna(value):
