@@ -41,6 +41,7 @@ from .config import (
     COL_PERIOD,
     COL_STATUS,
     WORKSHEET_WEEKLY_PERIOD_NOTES,
+    COL_WPN_SOURCE,
     COL_WPN_PERIOD,
     COL_WPN_NOTE,
     COL_WPN_UPDATED_AT,
@@ -317,73 +318,67 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
     return result
 
 
-def save_weekly_period_notes(period_notes: dict[int, str]) -> None:
+def save_weekly_period_notes(period_notes: dict[int, str], source: str = "current") -> None:
     sh = _get_spreadsheet()
     ws = _get_or_create_worksheet(
         sh,
         WORKSHEET_WEEKLY_PERIOD_NOTES,
         WEEKLY_PERIOD_NOTE_COLUMNS,
     )
-
     updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-
+    source = str(source).strip().lower() or "current"
     rows = []
     for period, note in period_notes.items():
         try:
             p = int(period)
         except Exception:
             continue
-
         if p <= 0:
             continue
-
         rows.append([
+            source,
             p,
             str(note).strip(),
             updated_at,
         ])
-
     all_values = ws.get_all_values()
     if not all_values:
         ws.append_row(WEEKLY_PERIOD_NOTE_COLUMNS)
         all_values = [WEEKLY_PERIOD_NOTE_COLUMNS]
-
     keep_rows = [all_values[0]]
-    existing_periods = {str(int(p)) for p in period_notes.keys()}
-
+    existing_keys = {(source, str(int(p))) for p in period_notes.keys()}
     for row in all_values[1:]:
-        if len(row) > 0 and str(row[0]).strip() not in existing_periods:
+        row_source = str(row[0]).strip().lower() if len(row) > 0 else ""
+        row_period = str(row[1]).strip() if len(row) > 1 else ""
+        if (row_source, row_period) not in existing_keys:
             keep_rows.append(row)
-
     ws.clear()
     ws.update("A1", keep_rows)
-
     if rows:
         start_row = len(keep_rows) + 1
         end_row = start_row + len(rows) - 1
-        ws.update(f"A{start_row}:C{end_row}", rows)
+        ws.update(f"A{start_row}:D{end_row}", rows)
 
 
-def load_weekly_period_notes() -> dict[int, str]:
+def load_weekly_period_notes(source: str = "current") -> dict[int, str]:
     sh = _get_spreadsheet()
     ws = _get_or_create_worksheet(
         sh,
         WORKSHEET_WEEKLY_PERIOD_NOTES,
         WEEKLY_PERIOD_NOTE_COLUMNS,
     )
-
     records = ws.get_all_records()
-
+    source = str(source).strip().lower() or "current"
     result: dict[int, str] = {}
     for row in records:
+        row_source = str(row.get(COL_WPN_SOURCE, "")).strip().lower()
+        if row_source != source:
+            continue
         try:
             period = int(row.get(COL_WPN_PERIOD, 0))
         except Exception:
             continue
-
         if period <= 0:
             continue
-
         result[period] = str(row.get(COL_WPN_NOTE, "")).strip()
-
     return result

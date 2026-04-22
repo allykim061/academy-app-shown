@@ -5,7 +5,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from .config import (
-    SCOPE, WORKSHEET_STUDENTS,
+    SCOPE, WORKSHEET_STUDENTS, WORKSHEET_STUDENTS_NEXT,
     REQUIRED_COLUMNS,
     COL_SCHOOL, COL_PERIOD, COL_STATUS, COL_DAYS,
     COL_STUDENT_MEMO,
@@ -14,14 +14,14 @@ from .utils import norm, normalize_school_name
 from .filters import norm_series
 
 @st.cache_data(ttl=300, show_spinner="loading...")
-def load_data() -> pd.DataFrame:
+def load_data(worksheet_name: str = WORKSHEET_STUDENTS) -> pd.DataFrame:
     try:
         creds_info = st.secrets["SERVICE_ACCOUNT_INFO"]
         creds = Credentials.from_service_account_info(creds_info, scopes=SCOPE)
         client = gspread.authorize(creds)
 
         sh = client.open(st.secrets["SPREADSHEET_NAME"])
-        ws = sh.worksheet(WORKSHEET_STUDENTS)
+        ws = sh.worksheet(worksheet_name)
 
         df = pd.DataFrame(ws.get_all_records())
 

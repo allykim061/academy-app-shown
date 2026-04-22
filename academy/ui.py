@@ -5,7 +5,8 @@ import pandas as pd
 from .config import (
     COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS,
     COL_STUDENT_MEMO,
-    GRADE_ORDER, WEEKDAY_ORDER
+    GRADE_ORDER, WEEKDAY_ORDER,
+    WORKSHEET_STUDENTS, WORKSHEET_STUDENTS_NEXT,
 )
 from .data import load_data
 from .styles import get_print_css_cached
@@ -151,120 +152,117 @@ def run_app():
     # 탭 2
     with tab_list[2]:
         st.markdown(print_banner, unsafe_allow_html=True)
-        if not df.empty:
-
-            # 알림 메시지
-            if st.session_state.get("weekly_note_msg") == "apply":
-                st.success("인쇄에 반영되었습니다.")
-                st.session_state.pop("weekly_note_msg", None)
-
-            elif st.session_state.get("weekly_note_msg") == "save":
-                st.success("저장 완료, 인쇄에 반영됩니다")
-                st.session_state.pop("weekly_note_msg", None)
-
-            if st.session_state.get("weekly_note_error"):
-                st.error(st.session_state["weekly_note_error"])
-                st.session_state.pop("weekly_note_error", None)
-
-            # 하단 표기
+        # 탭 2는 선택된 워크시트 기준으로 별도 로드
+        st.markdown("<div class='no-print'>", unsafe_allow_html=True)
+        src_col1, src_col2 = st.columns([2.2, 3.8], vertical_alignment="bottom")
+        with src_col1:
+            table2_source_label = st.radio(
+                "명단 선택",
+                ["현재 명단", "다음달 예정"],
+                horizontal=True,
+                key="table2_source_label",
+            )
+        with src_col2:
             m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
-
-            # 교시별 비고 저장값 로드
-            weekly_period_note_key = "weekly_period_notes"
+        st.markdown("</div>", unsafe_allow_html=True)
+        source_key = "current" if table2_source_label == "현재 명단" else "next"
+        worksheet_name = WORKSHEET_STUDENTS if source_key == "current" else WORKSHEET_STUDENTS_NEXT
+        df_table2 = load_data(worksheet_name)
+        if not df_table2.empty:
+            # source별 알림 메시지
+            weekly_note_msg_key = f"weekly_note_msg_{source_key}"
+            weekly_note_error_key = f"weekly_note_error_{source_key}"
+            if st.session_state.get(weekly_note_msg_key) == "apply":
+                st.success("인쇄에 반영되었습니다.")
+                st.session_state.pop(weekly_note_msg_key, None)
+            elif st.session_state.get(weekly_note_msg_key) == "save":
+                st.success("저장 완료, 인쇄에 반영됩니다.")
+                st.session_state.pop(weekly_note_msg_key, None)
+            if st.session_state.get(weekly_note_error_key):
+                st.error(st.session_state[weekly_note_error_key])
+                st.session_state.pop(weekly_note_error_key, None)
+            # source별 교시 비고 저장값 로드
+            weekly_period_note_key = f"weekly_period_notes_{source_key}"
             if weekly_period_note_key not in st.session_state:
                 try:
-                    st.session_state[weekly_period_note_key] = load_weekly_period_notes()
+                    st.session_state[weekly_period_note_key] = load_weekly_period_notes(source=source_key)
                 except Exception:
                     st.session_state[weekly_period_note_key] = {1: "", 2: "", 3: ""}
-
-            # 체크박스 / selectbox 기본값 보장
-            if "chk_show_period_notes_t2" not in st.session_state:
-                st.session_state["chk_show_period_notes_t2"] = True
-
-            if "weekly_selected_period_note" not in st.session_state:
-                st.session_state["weekly_selected_period_note"] = 1
-
-            # 현재 상태값 읽기
-            show_period_notes_t2 = st.session_state["chk_show_period_notes_t2"]
-            selected_period = st.session_state["weekly_selected_period_note"]
-
+            # 체크박스 / selectbox 기본값도 source별 분리
+            chk_show_key = f"chk_show_period_notes_t2_{source_key}"
+            selected_period_key = f"weekly_selected_period_note_{source_key}"
+            if chk_show_key not in st.session_state:
+                st.session_state[chk_show_key] = True
+            if selected_period_key not in st.session_state:
+                st.session_state[selected_period_key] = 1
+            show_period_notes_t2 = st.session_state[chk_show_key]
+            selected_period = st.session_state[selected_period_key]
             # 1) HTML 미리보기
             st.markdown(
-                f"<div class='report-view'>{generate_table2(df, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div>",
+                f"<div class='report-view'>{generate_table2(df_table2, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div>",
                 unsafe_allow_html=True
             )
-
             # 2) 아래부터 입력 UI만 인쇄 제외
             st.markdown("<div class='no-print'>", unsafe_allow_html=True)
-
             # 3) 한 줄 헤더: [비고 | 설명]   [비고칸 표시 | selectbox]
             left_col, right_col = st.columns([3.8, 2.2], vertical_alignment="bottom")
-
             with left_col:
+                title_text = "비고"
+                sub_text = "한 줄에 12자정도씩 입력해주세요"
                 st.markdown(
-                    """
+                    f"""
                     <div class="weekly-note-header no-print" style="margin-top:14px; margin-bottom:6px; display:flex; align-items:baseline; gap:8px;">
-                        <div style="font-weight:600; font-size:13px;">비고</div>
-                        <div style="font-size:11px; color:#363636;">한 줄에 12자정도씩 입력해주세요</div>
+                        <div style="font-weight:600; font-size:13px;">{title_text}</div>
+                        <div style="font-size:11px; color:#363636;">{sub_text}</div>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
-
             with right_col:
                 chk_col, select_col = st.columns([1.15, 1.0], vertical_alignment="bottom")
-
                 with chk_col:
-                    st.checkbox("비고칸 표시", key="chk_show_period_notes_t2")
-
+                    st.checkbox("비고칸 표시", key=chk_show_key)
                 with select_col:
                     st.selectbox(
                         "교시 선택",
                         [1, 2, 3],
                         format_func=lambda x: f"{x}교시",
-                        key="weekly_selected_period_note",
+                        key=selected_period_key,
                         label_visibility="collapsed",
                     )
-
             # 최신 상태값 다시 읽기
-            show_period_notes_t2 = st.session_state["chk_show_period_notes_t2"]
-            selected_period = st.session_state["weekly_selected_period_note"]
-
+            show_period_notes_t2 = st.session_state[chk_show_key]
+            selected_period = st.session_state[selected_period_key]
             # 4) 입력칸 + 버튼
-            with st.form(key="weekly_note_form", clear_on_submit=False):
+            with st.form(key=f"weekly_note_form_{source_key}", clear_on_submit=False):
                 note_val = st.text_area(
                     "",
                     value=st.session_state[weekly_period_note_key].get(selected_period, ""),
-                    key=f"weekly_period_note_input_{selected_period}",
+                    key=f"weekly_period_note_input_{source_key}_{selected_period}",
                     height=260,
                     label_visibility="collapsed",
                 )
-
                 btn_apply, btn_save, btn_blank = st.columns([1, 1, 6])
-
                 with btn_apply:
                     apply_clicked = st.form_submit_button("적용", use_container_width=True)
-
                 with btn_save:
                     save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
-
             st.markdown("</div>", unsafe_allow_html=True)
-
             if apply_clicked or save_clicked:
                 merged_period_notes = dict(st.session_state[weekly_period_note_key])
                 merged_period_notes[selected_period] = str(note_val).strip()
                 st.session_state[weekly_period_note_key] = merged_period_notes
-
                 if save_clicked:
                     try:
-                        save_weekly_period_notes(st.session_state[weekly_period_note_key])
-                        st.session_state["weekly_note_msg"] = "save"
+                        save_weekly_period_notes(st.session_state[weekly_period_note_key], source=source_key)
+                        st.session_state[weekly_note_msg_key] = "save"
                     except Exception as e:
-                        st.session_state["weekly_note_error"] = f"저장 실패: {e}"
+                        st.session_state[weekly_note_error_key] = f"저장 실패: {e}"
                 else:
-                    st.session_state["weekly_note_msg"] = "apply"
-
+                    st.session_state[weekly_note_msg_key] = "apply"
                 st.rerun()
+        else:
+            st.info(f"'{worksheet_name}' 워크시트에 데이터가 없습니다.")
 
     # 탭 3
     with tab_list[3]:
