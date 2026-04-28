@@ -13,7 +13,7 @@ from .config import (
 from .utils import norm, normalize_school_name
 from .filters import norm_series
 
-@st.cache_data(ttl=300, show_spinner="loading...")
+@st.cache_data(ttl=10, show_spinner="loading...")
 def load_data(worksheet_name: str = WORKSHEET_STUDENTS) -> pd.DataFrame:
     try:
         creds_info = st.secrets["SERVICE_ACCOUNT_INFO"]

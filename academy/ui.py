@@ -32,7 +32,7 @@ def run_app():
 
     # ✅ 배정 저장소(session_state)
     if "assignments" not in st.session_state:
-        st.session_state["assignments"] = {}  # {date_iso: {(period, student_key): {"letter": "", "absent": False}}}
+        st.session_state["assignments"] = {}
 
     # 사이드바
     with st.sidebar:
@@ -41,17 +41,37 @@ def run_app():
 
         if st.button("새로고침"):
             st.cache_data.clear()
-
+            st.session_state["refresh_done"] = True
             for k in list(st.session_state.keys()):
                 if k.startswith("preview_html_") or k.startswith("attendance_editor_version_"):
                     del st.session_state[k]
-
             st.rerun()
 
-    tab_list = st.tabs(["전체 목록", "학년별 명단", "수업시간 명단", "출석부", "학교별 명단"])
+    # 1. 공백 문자 정의 (메뉴가 5개이므로 2개 정도가 적당합니다)
+    blank = "\u2003" * 2 
 
-    # 탭 0
-    with tab_list[0]:
+    # 2. segmented_control 적용
+    page_with_blank = st.segmented_control(
+        "메뉴",
+        [
+            f"{blank}전체 목록{blank}", 
+            f"{blank}학년별 명단{blank}", 
+            f"{blank}전체 출석부{blank}", 
+            f"{blank}일일 출석부{blank}", 
+            f"{blank}학교별 명단{blank}"
+        ],
+        selection_mode="single",
+        default=f"{blank}전체 목록{blank}",
+        key="main_page",
+        label_visibility="collapsed",
+    ) or f"{blank}전체 목록{blank}"
+
+    # 3. 로직 비교를 위해 공백 제거 (매우 중요!)
+    # 아래 조건문(if page == "전체 목록": 등)들이 작동하려면 공백을 떼어내야 합니다.
+    page = page_with_blank.strip()
+
+    # 0번
+    if page == "전체 목록":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             display_df = df[[COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS]]
@@ -133,8 +153,8 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    # 탭 1
-    with tab_list[1]:
+    # 1번
+    elif page == "학년별 명단":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             col1, col2 = st.columns([3, 1])
@@ -149,12 +169,13 @@ def run_app():
                 unsafe_allow_html=True,
             )
 
-    # 탭 2
-    with tab_list[2]:
+    # 2번
+    elif page == "전체 출석부":
         st.markdown(print_banner, unsafe_allow_html=True)
-        # 탭 2는 선택된 워크시트 기준으로 별도 로드
+
         st.markdown("<div class='no-print'>", unsafe_allow_html=True)
         src_col1, src_col2 = st.columns([2.2, 3.8], vertical_alignment="bottom")
+
         with src_col1:
             table2_source_label = st.radio(
                 "명단 선택",
@@ -162,62 +183,68 @@ def run_app():
                 horizontal=True,
                 key="table2_source_label",
             )
+
         with src_col2:
             m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
+
         st.markdown("</div>", unsafe_allow_html=True)
+
         source_key = "current" if table2_source_label == "현재 명단" else "next"
         worksheet_name = WORKSHEET_STUDENTS if source_key == "current" else WORKSHEET_STUDENTS_NEXT
         df_table2 = load_data(worksheet_name)
+
         if not df_table2.empty:
-            # source별 알림 메시지
             weekly_note_msg_key = f"weekly_note_msg_{source_key}"
             weekly_note_error_key = f"weekly_note_error_{source_key}"
+
             if st.session_state.get(weekly_note_msg_key) == "apply":
                 st.success("인쇄에 반영되었습니다.")
                 st.session_state.pop(weekly_note_msg_key, None)
             elif st.session_state.get(weekly_note_msg_key) == "save":
                 st.success("저장 완료, 인쇄에 반영됩니다.")
                 st.session_state.pop(weekly_note_msg_key, None)
+
             if st.session_state.get(weekly_note_error_key):
                 st.error(st.session_state[weekly_note_error_key])
                 st.session_state.pop(weekly_note_error_key, None)
-            # source별 교시 비고 저장값 로드
+
             weekly_period_note_key = f"weekly_period_notes_{source_key}"
             if weekly_period_note_key not in st.session_state:
                 try:
                     st.session_state[weekly_period_note_key] = load_weekly_period_notes(source=source_key)
                 except Exception:
                     st.session_state[weekly_period_note_key] = {1: "", 2: "", 3: ""}
-            # 체크박스 / selectbox 기본값도 source별 분리
+
             chk_show_key = f"chk_show_period_notes_t2_{source_key}"
             selected_period_key = f"weekly_selected_period_note_{source_key}"
+
             if chk_show_key not in st.session_state:
                 st.session_state[chk_show_key] = True
             if selected_period_key not in st.session_state:
                 st.session_state[selected_period_key] = 1
+
             show_period_notes_t2 = st.session_state[chk_show_key]
             selected_period = st.session_state[selected_period_key]
-            # 1) HTML 미리보기
+
             st.markdown(
                 f"<div class='report-view'>{generate_table2(df_table2, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div>",
                 unsafe_allow_html=True
             )
-            # 2) 아래부터 입력 UI만 인쇄 제외
+
             st.markdown("<div class='no-print'>", unsafe_allow_html=True)
-            # 3) 한 줄 헤더: [비고 | 설명]   [비고칸 표시 | selectbox]
+
             left_col, right_col = st.columns([3.8, 2.2], vertical_alignment="bottom")
             with left_col:
-                title_text = "비고"
-                sub_text = "한 줄에 12자정도씩 입력해주세요"
                 st.markdown(
-                    f"""
+                    """
                     <div class="weekly-note-header no-print" style="margin-top:14px; margin-bottom:6px; display:flex; align-items:baseline; gap:8px;">
-                        <div style="font-weight:600; font-size:13px;">{title_text}</div>
-                        <div style="font-size:11px; color:#363636;">{sub_text}</div>
+                        <div style="font-weight:600; font-size:13px;">비고</div>
+                        <div style="font-size:11px; color:#363636;">한 줄에 12자정도씩 입력해주세요</div>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
+
             with right_col:
                 chk_col, select_col = st.columns([1.15, 1.0], vertical_alignment="bottom")
                 with chk_col:
@@ -230,10 +257,10 @@ def run_app():
                         key=selected_period_key,
                         label_visibility="collapsed",
                     )
-            # 최신 상태값 다시 읽기
+
             show_period_notes_t2 = st.session_state[chk_show_key]
             selected_period = st.session_state[selected_period_key]
-            # 4) 입력칸 + 버튼
+
             with st.form(key=f"weekly_note_form_{source_key}", clear_on_submit=False):
                 note_val = st.text_area(
                     "",
@@ -242,16 +269,20 @@ def run_app():
                     height=260,
                     label_visibility="collapsed",
                 )
+
                 btn_apply, btn_save, btn_blank = st.columns([1, 1, 6])
                 with btn_apply:
                     apply_clicked = st.form_submit_button("적용", use_container_width=True)
                 with btn_save:
                     save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
+
             st.markdown("</div>", unsafe_allow_html=True)
+
             if apply_clicked or save_clicked:
                 merged_period_notes = dict(st.session_state[weekly_period_note_key])
                 merged_period_notes[selected_period] = str(note_val).strip()
                 st.session_state[weekly_period_note_key] = merged_period_notes
+
                 if save_clicked:
                     try:
                         save_weekly_period_notes(st.session_state[weekly_period_note_key], source=source_key)
@@ -260,12 +291,13 @@ def run_app():
                         st.session_state[weekly_note_error_key] = f"저장 실패: {e}"
                 else:
                     st.session_state[weekly_note_msg_key] = "apply"
+
                 st.rerun()
         else:
             st.info(f"'{worksheet_name}' 워크시트에 데이터가 없습니다.")
 
-    # 탭 3
-    with tab_list[3]:
+    # 3번
+    elif page == "일일 출석부":
         st.markdown(print_banner, unsafe_allow_html=True)
 
         if not df.empty:
@@ -313,7 +345,8 @@ def run_app():
             </style>
             """, unsafe_allow_html=True)
 
-            d3 = st.date_input("날짜 선택", value=today_kst())
+            # 위젯에 key 파라미터 부여
+            d3 = st.date_input("날짜 선택", value=today_kst(), key="attendance_date")
             weekday = WEEKDAY_ORDER[d3.weekday()]
             date_key = d3.isoformat()
 
@@ -368,9 +401,7 @@ def run_app():
             st.caption("💡 배정: 알파벳 1글자 입력 · Enter / 방향키 이동")
 
             summary_clicked = False
-            apply_clicked = False
             save_clicked = False
-            reset_clicked = False
 
             st.markdown("<div id='t3-editor'></div>", unsafe_allow_html=True)
 
@@ -457,8 +488,6 @@ def run_app():
                 with btn_save:
                     save_clicked = st.form_submit_button("저장", use_container_width=True, type="primary")
 
-                apply_clicked = False
-                reset_clicked = False
                 st.markdown("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
                 if has_p1 and has_p2 and not has_p3:
@@ -595,20 +624,18 @@ def run_app():
                     summary_result[p] = build_period_summary(df_edited)
                 st.session_state[summary_key] = summary_result
 
-            if save_clicked:
                 st.session_state[teacher_note_key] = {
                     1: str(note_1).strip(),
                     2: str(note_2).strip(),
                     3: str(note_3).strip(),
                 }
 
-            if save_clicked:
                 try:
                     save_attendance_for_date(date_key, day_store)
                     save_teacher_notes_for_date(date_key, st.session_state[teacher_note_key])
-                    st.toast("💾저장 완료")
+                    st.toast("💾 저장 완료")
                 except Exception as e:
-                    st.error(f"🚨저장 실패: {e}")
+                    st.error(f"🚨 저장 실패: {e}")
 
             st.markdown(
                 """
@@ -650,9 +677,12 @@ def run_app():
                 unsafe_allow_html=True
             )
 
-    # 탭 4
-    with tab_list[4]:
+    # 4번
+    elif page == "학교별 명단":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             m4 = st.text_input("제목(연/월)", value=now_kst().strftime("%Y.%m"), key="m4")
-            st.markdown(f"<div class='a4-print-box'><div class='report-view'>{generate_table4(df, True, m4)}</div></div>", unsafe_allow_html=True)
+            st.markdown(
+                f"<div class='a4-print-box'><div class='report-view'>{generate_table4(df, True, m4)}</div></div>",
+                unsafe_allow_html=True
+            )
