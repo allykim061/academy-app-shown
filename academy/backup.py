@@ -265,19 +265,6 @@ def save_teacher_notes_for_date(date_key: str, teacher_notes: dict[int, str]) ->
 
     updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
 
-    all_values = ws.get_all_values()
-    if not all_values:
-        ws.append_row(ATTENDANCE_TEACHER_NOTE_COLUMNS)
-        all_values = [ATTENDANCE_TEACHER_NOTE_COLUMNS]
-
-    keep_rows = [all_values[0]]
-    for row in all_values[1:]:
-        if len(row) > 0 and row[0] != date_key:
-            keep_rows.append(row)
-
-    ws.clear()
-    ws.update("A1", keep_rows)
-
     rows = []
     for period in [1, 2, 3]:
         note = str(teacher_notes.get(period, "")).strip()
@@ -289,10 +276,7 @@ def save_teacher_notes_for_date(date_key: str, teacher_notes: dict[int, str]) ->
         ])
 
     if rows:
-        start_row = len(keep_rows) + 1
-        end_row = start_row + len(rows) - 1
-        ws.update(f"A{start_row}:D{end_row}", rows)
-
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
 
 def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
     sh = _get_spreadsheet()
@@ -306,7 +290,23 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
     rows = [r for r in records if str(r.get(COL_TNOTE_DATE, "")).strip() == date_key]
 
     result = {1: "", 2: "", 3: ""}
-    for row in rows:
+    if not rows:
+        return result
+
+    df = pd.DataFrame(rows)
+
+    if df.empty:
+        return result
+
+    if COL_TNOTE_UPDATED_AT in df.columns:
+        df[COL_TNOTE_UPDATED_AT] = df[COL_TNOTE_UPDATED_AT].astype(str)
+
+    latest_by_period = (
+        df.sort_values(COL_TNOTE_UPDATED_AT)
+          .drop_duplicates(subset=[COL_TNOTE_PERIOD], keep="last")
+    )
+
+    for _, row in latest_by_period.iterrows():
         try:
             period = int(row.get(COL_TNOTE_PERIOD, 0))
         except Exception:
@@ -316,7 +316,6 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
             result[period] = str(row.get(COL_TNOTE_NOTE, "")).strip()
 
     return result
-
 
 def save_weekly_period_notes(period_notes: dict[int, str], source: str = "current") -> None:
     sh = _get_spreadsheet()

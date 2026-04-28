@@ -158,7 +158,7 @@ def run_app():
         with src_col1:
             table2_source_label = st.radio(
                 "명단 선택",
-                ["현재 명단", "다음달 예정"],
+                ["현재 명단", "다음달 명단"],
                 horizontal=True,
                 key="table2_source_label",
             )
@@ -589,8 +589,6 @@ def run_app():
                                 "absent": bool(v_abs),
                             }
 
-                st.success("저장 완료, 인쇄에 반영됩니다.")
-
                 summary_result = {}
                 for p in [1, 2, 3]:
                     df_edited = edited_dfs.get(p)
@@ -608,9 +606,9 @@ def run_app():
                 try:
                     save_attendance_for_date(date_key, day_store)
                     save_teacher_notes_for_date(date_key, st.session_state[teacher_note_key])
-                    st.success("저장 완료")
+                    st.toast("💾저장 완료")
                 except Exception as e:
-                    st.error(f"저장 실패: {e}")
+                    st.error(f"🚨저장 실패: {e}")
 
             st.markdown(
                 """
