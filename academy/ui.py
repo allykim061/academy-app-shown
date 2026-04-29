@@ -15,12 +15,13 @@ from .tables import (
     generate_table1, generate_table2, generate_table3, generate_table4
 )
 from .filters import filter_students_for_day_period
-from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days, match_attendance
+from .utils import get_student_key, sanitize_letter, now_kst, today_kst, split_days
 from .backup import (
     save_attendance_for_date, load_attendance_for_date,
     save_teacher_notes_for_date, load_teacher_notes_for_date,
     save_weekly_period_notes, load_weekly_period_notes,
 )
+
 
 def run_app():
     df = load_data()
@@ -30,35 +31,30 @@ def run_app():
         'border-left:5px solid #868396;margin-bottom:20px;">🖨️ 인쇄: 우측 상단 ⋮ ➜ Print 선택</div>'
     )
 
-    # ✅ 배정 저장소(session_state)
     if "assignments" not in st.session_state:
         st.session_state["assignments"] = {}
 
-    # 사이드바
     with st.sidebar:
         print_orientation = st.radio("용지 방향", ["세로", "가로"])
         st.markdown(get_print_css_cached(print_orientation), unsafe_allow_html=True)
 
         if st.button("새로고침"):
             st.cache_data.clear()
-            st.session_state["refresh_done"] = True
             for k in list(st.session_state.keys()):
                 if k.startswith("preview_html_") or k.startswith("attendance_editor_version_"):
                     del st.session_state[k]
             st.rerun()
 
-    # 1. 공백 문자 정의 (메뉴가 5개이므로 2개 정도가 적당합니다)
-    blank = "\u2003" * 2 
+    blank = "\u2003" * 2
 
-    # 2. segmented_control 적용
     page_with_blank = st.segmented_control(
         "메뉴",
         [
-            f"{blank}전체 목록{blank}", 
-            f"{blank}학년별 명단{blank}", 
-            f"{blank}전체 출석부{blank}", 
-            f"{blank}일일 출석부{blank}", 
-            f"{blank}학교별 명단{blank}"
+            f"{blank}전체 목록{blank}",
+            f"{blank}학년별 명단{blank}",
+            f"{blank}전체 출석부{blank}",
+            f"{blank}일일 출석부{blank}",
+            f"{blank}학교별 명단{blank}",
         ],
         selection_mode="single",
         default=f"{blank}전체 목록{blank}",
@@ -66,8 +62,6 @@ def run_app():
         label_visibility="collapsed",
     ) or f"{blank}전체 목록{blank}"
 
-    # 3. 로직 비교를 위해 공백 제거 (매우 중요!)
-    # 아래 조건문(if page == "전체 목록": 등)들이 작동하려면 공백을 떼어내야 합니다.
     page = page_with_blank.strip()
 
     # 0번
@@ -86,6 +80,9 @@ def run_app():
                 filtered_df = display_df[mask]
             else:
                 filtered_df = display_df
+
+            q_now = (st.session_state.get("tab0_search", "") or "").strip()
+            print_msg = f"'{q_now}' 검색 결과: {len(filtered_df)}명" if q_now else ""
 
             st.markdown("<div class='no-print'>", unsafe_allow_html=True)
 
@@ -120,9 +117,7 @@ def run_app():
                 with col_reset_spacer:
                     st.empty()
                 with col_msg:
-                    q_now = (st.session_state.get("tab0_search", "") or "").strip()
                     msg = f"'{q_now}' 검색 결과: {len(filtered_df)}명" if q_now else "&nbsp;"
-
                     st.markdown(
                         f"<div class='no-print' style='font-size:12px;color:#666;text-align:left;margin-top:-6px;min-height:18px;'>{msg}</div>",
                         unsafe_allow_html=True
@@ -135,12 +130,9 @@ def run_app():
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-            q_now = (st.session_state.get("tab0_search", "") or "").strip()
-            print_msg = f"'{q_now}' 검색 결과: {len(filtered_df)}명" if q_now else ""
-
             st.markdown(
                 f"""
-                <div class="tab0-print-root">
+                <div class="print-area tab0-print-root">
                     <div class="tab0-print-header">
                         <h2 class="tab0-print-title">
                             등록 학생 목록 <span class="tab0-print-count">[총 {total_n}명]</span>
@@ -165,7 +157,7 @@ def run_app():
                 show_count_t1 = st.checkbox("학교별 인원수 표시", value=True, key="chk_count_m1")
 
             st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{generate_table1(df, show_school_t1, show_count_t1, m1)}</div></div>",
+                f"<div class='print-area'><div class='a4-print-box'><div class='report-view'>{generate_table1(df, show_school_t1, show_count_t1, m1)}</div></div></div>",
                 unsafe_allow_html=True,
             )
 
@@ -227,7 +219,7 @@ def run_app():
             selected_period = st.session_state[selected_period_key]
 
             st.markdown(
-                f"<div class='report-view'>{generate_table2(df_table2, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div>",
+                f"<div class='print-area'><div class='report-view'>{generate_table2(df_table2, m2, period_notes=st.session_state[weekly_period_note_key], show_period_notes=show_period_notes_t2)}</div></div>",
                 unsafe_allow_html=True
             )
 
@@ -345,7 +337,6 @@ def run_app():
             </style>
             """, unsafe_allow_html=True)
 
-            # 위젯에 key 파라미터 부여
             d3 = st.date_input("날짜 선택", value=today_kst(), key="attendance_date")
             weekday = WEEKDAY_ORDER[d3.weekday()]
             date_key = d3.isoformat()
@@ -407,11 +398,7 @@ def run_app():
 
             def build_period_summary(df_edited: pd.DataFrame | None) -> dict:
                 if df_edited is None or df_edited.empty:
-                    return {
-                        "total": 0,
-                        "absent": 0,
-                        "letters": {}
-                    }
+                    return {"total": 0, "absent": 0, "letters": {}}
 
                 total = len(df_edited)
                 absent = int(df_edited["결석"].fillna(False).astype(bool).sum())
@@ -445,12 +432,9 @@ def run_app():
                     with col:
                         data = summary_data.get(p, {"total": 0, "absent": 0, "letters": {}})
                         lines = [f"인원 | {data['total']}명"]
-
                         for letter, count in data["letters"].items():
                             lines.append(f"{letter} | {count}명")
-
                         lines.append(f"결석 | {data['absent']}명")
-
                         body = "<br>".join(lines)
 
                         st.markdown(
@@ -524,7 +508,6 @@ def run_app():
                             school = str(row[COL_SCHOOL]).strip()
                             grade = str(row[COL_GRADE]).strip()
                             school_grade = school + (grade[1:] if school and grade and school[-1] == grade[0] else grade)
-
                             student_memo = str(row.get(COL_STUDENT_MEMO, "")).strip()
 
                             editor_data.append({
@@ -563,9 +546,7 @@ def run_app():
                     """
                     <div class="no-print" style="margin-top:12px; margin-bottom:8px;">
                         <h4 style="margin:0 0 6px 0; font-size:14px;">메모</h4>
-                        <div style="font-size:12px; color:#666;">
-                            한 줄에 8~10자 정도 입력
-                        </div>
+                        <div style="font-size:12px; color:#666;">한 줄에 8~10자 정도 입력</div>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -612,7 +593,6 @@ def run_app():
                             skey = row["_skey"]
                             v_let = row["배정"]
                             v_abs = row["결석"]
-
                             day_store[(p, skey)] = {
                                 "letter": sanitize_letter(v_let),
                                 "absent": bool(v_abs),
@@ -661,7 +641,7 @@ def run_app():
             )
 
             st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{preview_html}</div></div>",
+                f"<div class='print-area'><div class='a4-print-box'><div class='report-view'>{preview_html}</div></div></div>",
                 unsafe_allow_html=True
             )
 
@@ -683,6 +663,7 @@ def run_app():
         if not df.empty:
             m4 = st.text_input("제목(연/월)", value=now_kst().strftime("%Y.%m"), key="m4")
             st.markdown(
-                f"<div class='a4-print-box'><div class='report-view'>{generate_table4(df, True, m4)}</div></div>",
+                f"<div class='print-area'><div class='a4-print-box'><div class='report-view'>{generate_table4(df, True, m4)}</div></div></div>",
                 unsafe_allow_html=True
             )
+
