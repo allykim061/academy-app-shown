@@ -500,83 +500,171 @@ def get_print_css(orientation: str = "세로") -> str:
            ========================================================= */
         @media print {{
             /* -----------------------------------------------------
-            1) 기본: 전부 숨김
+            1) 화면 UI 숨김
             ----------------------------------------------------- */
-            body * {{
-                visibility: hidden !important;
+            header,
+            footer,
+            [data-testid="stSidebar"],
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            [data-testid="stDecoration"],
+            [data-testid="stStatusWidget"],
+            [data-testid="stSegmentedControl"],
+            [data-testid="stSegmentedControl"] *,
+            [role="radiogroup"],
+            [role="radiogroup"] *,
+            .stButton,
+            .stTextInput,
+            .stDateInput,
+            .stCheckbox,
+            .stSelectbox,
+            .stRadio,
+            .stForm,
+            [data-testid="stForm"],
+            [data-testid="stAlert"],
+            [data-testid="stCaptionContainer"],
+            [data-testid="stDataFrame"],
+            .no-print {{
+                display: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }}
+
             /* -----------------------------------------------------
-            2) 인쇄 대상만 표시
+            2) 인쇄영역 없는 빈 껍데기 제거
             ----------------------------------------------------- */
-            .print-area,
-            .print-area * {{
-                visibility: visible !important;
+            .element-container:not(:has(.print-area)) {{
+                display: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }}
+
+            /* 이 래퍼는 Streamlit 버전에 따라 다를 수 있으므로 보조용 */
+            .stVerticalBlockBorderWrapper:not(:has(.print-area)) {{
+                display: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }}
+
             /* -----------------------------------------------------
-            3) 인쇄 대상 위치 보정
+            3) Streamlit 기본 여백/간격 제거
+            ----------------------------------------------------- */
+            html,
+            body,
+            .stApp,
+            .stAppViewContainer,
+            section.main,
+            .main,
+            .block-container,
+            [data-testid="stVerticalBlock"],
+            [data-testid="stHorizontalBlock"] {{
+                margin: 0 !important;
+                padding: 0 !important;
+                gap: 0 !important;
+            }}
+
+            .block-container {{
+                max-width: 100% !important;
+            }}
+
+            /* -----------------------------------------------------
+            4) 인쇄 영역은 자연 흐름 유지
             ----------------------------------------------------- */
             .print-area {{
-                position: fixed !important;
-                left: 0 !important;
-                top: 0 !important;
+                display: block !important;
+                position: static !important;
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                z-index: 9999 !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
             }}
-            /* -----------------------------------------------------
-            4) 페이지 여백 초기화
-            ----------------------------------------------------- */
-            html, body, .stApp, .stAppViewContainer,
-            section.main, .main, .block-container {{
-                margin: 0 !important;
-                padding: 0 !important;
-            }}
+
             .report-view {{
                 margin: 0 !important;
                 padding: 0 !important;
                 border: none !important;
                 background: #fff !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
             }}
+
             .tab0-print-root {{
                 display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }}
+
             /* -----------------------------------------------------
-            5) 기본 테이블 인쇄 스타일
+            5) 페이지 분할 허용
+            ----------------------------------------------------- */
+            .a4-print-box {{
+                margin: 0 !important;
+                padding-top: 2mm !important;
+                page-break-after: always;
+                break-after: page;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+            }}
+
+            .a4-print-box:last-child {{
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }}
+
+            /* -----------------------------------------------------
+            6) 제목/헤더 분리 방지
+            ----------------------------------------------------- */
+            h1, h2, h3, h4,
+            .tab0-print-header,
+            .weekly-title {{
+                margin-top: 0 !important;
+                page-break-after: avoid !important;
+                break-after: avoid-page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }}
+
+            /* -----------------------------------------------------
+            7) 기본 테이블 인쇄 스타일
             ----------------------------------------------------- */
             table {{
                 font-size: 7.5pt !important;
                 border: 1px solid #000 !important;
                 margin-bottom: 5px !important;
-                page-break-inside: auto;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
             }}
+
+            thead {{
+                display: table-header-group !important;
+            }}
+
             tr {{
-                page-break-inside: avoid;
-                page-break-after: auto;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }}
+
             table:not(.table3-custom) th,
             table:not(.table3-custom) td {{
                 border: 1px solid #000 !important;
                 color: #000 !important;
             }}
+
             /* -----------------------------------------------------
-            6) 0번표(전체 목록) 인쇄 전용
+            8) 0번표(전체 목록) 인쇄 전용
             ----------------------------------------------------- */
             .tab0-print-root table.total-list-table,
             .tab0-print-root table.total-list-table th,
             .tab0-print-root table.total-list-table td {{
                 border: 1px solid #A2A2A2 !important;
             }}
-            table.total-list-table thead {{
-                display: table-header-group !important;
-            }}
-            table.total-list-table tr {{
-                page-break-inside: auto !important;
-                break-inside: auto !important;
-            }}
+
             table.total-list-table tbody {{
                 break-inside: auto !important;
             }}
+
             .tab0-print-header {{
                 display: flex !important;
                 justify-content: space-between !important;
@@ -584,26 +672,30 @@ def get_print_css(orientation: str = "세로") -> str:
                 margin: 0 0 10px 0 !important;
                 padding-top: 2mm !important;
             }}
+
             .tab0-print-title {{
                 text-align: left !important;
                 font-size: 16pt !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }}
+
             .tab0-print-count {{
                 font-size: 11pt !important;
                 color: #000 !important;
                 font-weight: 700 !important;
                 margin-left: 6px !important;
             }}
+
             .tab0-print-search-msg {{
                 font-size: 11pt !important;
                 color: #000 !important;
                 font-weight: 500 !important;
                 margin-bottom: 2px !important;
             }}
+
             /* -----------------------------------------------------
-            7) 2번표(주간표) 인쇄 보정
+            9) 2번표(주간표) 인쇄 보정
             ----------------------------------------------------- */
             .weekly-table {{
                 width: 100% !important;
@@ -612,17 +704,20 @@ def get_print_css(orientation: str = "세로") -> str:
                 box-sizing: border-box !important;
                 table-layout: fixed !important;
             }}
+
             .weekly-note-header {{
                 display: none !important;
             }}
+
             /* -----------------------------------------------------
-            8) 3번표(출석부) 인쇄 전용 스타일
+            10) 3번표(출석부) 인쇄 전용 스타일
             ----------------------------------------------------- */
             .table3-custom th,
             .table3-custom td {{
                 border-left: 1px solid #000 !important;
                 border-right: 1px solid #000 !important;
             }}
+
             .table3-custom thead th {{
                 border-top: 1px solid #000 !important;
                 border-bottom: 2px solid #000 !important;
@@ -631,14 +726,17 @@ def get_print_css(orientation: str = "세로") -> str:
                 white-space: nowrap !important;
                 letter-spacing: -0.5px !important;
             }}
+
             .table3-custom th:first-child,
             .table3-custom td:first-child {{
                 border-left: 2px solid #000 !important;
             }}
+
             .table3-custom th:last-child,
             .table3-custom td:last-child {{
                 border-right: 2px solid #000 !important;
             }}
+
             .table3-custom tbody tr.t3-bottom td {{
                 padding: 0 !important;
                 height: 0 !important;
@@ -650,23 +748,27 @@ def get_print_css(orientation: str = "세로") -> str:
                 border-right: none !important;
                 background: transparent !important;
             }}
+
             .table3-custom .student-inner {{
                 font-size: 9.5pt !important;
             }}
+
             .table3-custom .summary-cell {{
                 font-size: 8.5pt !important;
                 line-height: 0.8 !important;
                 padding: 2px 4px !important;
                 vertical-align: top !important;
             }}
+
             .table3-custom td.t3-gap {{
                 height: 3px !important;
                 padding: 0 !important;
                 line-height: 0 !important;
                 font-size: 0 !important;
             }}
+
             /* -----------------------------------------------------
-            9) 인쇄 가독성 공통 보정
+            11) 인쇄 가독성 공통 보정
             ----------------------------------------------------- */
             th {{
                 background-color: #F1F5F9 !important;
@@ -676,37 +778,36 @@ def get_print_css(orientation: str = "세로") -> str:
                 padding: 4px 2px !important;
                 letter-spacing: -0.5px !important;
             }}
+
             td {{
                 padding: 2px 1px !important;
                 line-height: 1.0 !important;
             }}
+
             .daily-grid-container {{
                 gap: 4px !important;
             }}
+
             .check-box {{
                 width: 14px !important;
                 height: 14px !important;
                 border: 2px solid black !important;
             }}
+
             /* -----------------------------------------------------
-            10) 1번표 / 페이지 에어백
+            12) 1번표 / 4번표 인쇄 보정
             ----------------------------------------------------- */
             .table1-custom th,
             .table1-custom td:not(.t1-names) {{
                 font-size: 10pt !important;
             }}
+
             .table1-custom .t1-names {{
                 font-size: 10.5pt !important;
                 padding: 8px 6px !important;
                 line-height: 1.65 !important;
             }}
-            .a4-print-box {{
-                padding-top: 2mm !important;
-            }}
-            .a4-print-box + .a4-print-box {{
-                padding-top: 6mm !important;
-            }}
-        }}    </style>
+        }}   </style>
     """
 
 @st.cache_data
