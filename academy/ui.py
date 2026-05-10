@@ -38,34 +38,84 @@ def run_app():
         print_orientation = st.radio("용지 방향", ["세로", "가로"])
         st.markdown(get_print_css_cached(print_orientation), unsafe_allow_html=True)
 
-        if st.button("새로고침"):
-            st.cache_data.clear()
-            for k in list(st.session_state.keys()):
-                if k.startswith("preview_html_") or k.startswith("attendance_editor_version_"):
-                    del st.session_state[k]
-            st.rerun()
-
     blank = "\u2003" * 2
-
-    page_with_blank = st.segmented_control(
+    page_labels = {
+        "tab0": f"{blank}전체 목록{blank}",
+        "tab1": f"{blank}학년별 명단{blank}",
+        "tab2": f"{blank}전체 출석부{blank}",
+        "tab3": f"{blank}일일 출석부{blank}",
+        "tab4": f"{blank}학교별 명단{blank}",
+    }
+    selected_label = st.segmented_control(
         "메뉴",
-        [
-            f"{blank}전체 목록{blank}",
-            f"{blank}학년별 명단{blank}",
-            f"{blank}전체 출석부{blank}",
-            f"{blank}일일 출석부{blank}",
-            f"{blank}학교별 명단{blank}",
-        ],
+        list(page_labels.values()),
         selection_mode="single",
-        default=f"{blank}전체 목록{blank}",
+        default=page_labels["tab0"],
         key="main_page",
         label_visibility="collapsed",
-    ) or f"{blank}전체 목록{blank}"
+    ) or page_labels["tab0"]
+    label_to_page = {label: key for key, label in page_labels.items()}
+    page = label_to_page.get(selected_label, "tab0")
 
-    page = page_with_blank.strip()
+    with st.sidebar:
+        if st.button("새로고침"):
+            st.cache_data.clear()
 
+            keys_to_delete = []
+
+            if page == "tab0":
+                keys_to_delete.extend([
+                    "tab0_search",
+                ])
+
+            elif page == "tab1":
+                keys_to_delete.extend([
+                    "m1",
+                    "chk_school_m1",
+                    "chk_count_m1",
+                ])
+
+            elif page == "tab2":
+                keys_to_delete.extend([
+                    "table2_source_label",
+                    "m2",
+                ])
+
+                for k in list(st.session_state.keys()):
+                    if (
+                        k.startswith("weekly_note_msg_")
+                        or k.startswith("weekly_note_error_")
+                        or k.startswith("weekly_period_notes_")
+                        or k.startswith("chk_show_period_notes_t2_")
+                        or k.startswith("weekly_selected_period_note_")
+                        or k.startswith("weekly_period_note_input_")
+                    ):
+                        keys_to_delete.append(k)
+
+            elif page == "tab3":
+                for k in list(st.session_state.keys()):
+                    if (
+                        k.startswith("attendance_editor_version_")
+                        or k.startswith("attendance_summary_")
+                        or k.startswith("teacher_notes_")
+                        or k.startswith("attendance_save_in_progress_")
+                    ):
+                        keys_to_delete.append(k)
+
+                st.session_state["assignments"] = {}
+
+            elif page == "tab4":
+                keys_to_delete.extend([
+                    "m4",
+                ])
+
+            for k in set(keys_to_delete):
+                if k in st.session_state:
+                    del st.session_state[k]
+
+            st.rerun()    
     # 0번
-    if page == "전체 목록":
+    if page == "tab0":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             display_df = df[[COL_NAME, COL_SCHOOL, COL_GRADE, COL_DAYS, COL_PERIOD, COL_STATUS]]
@@ -146,7 +196,7 @@ def run_app():
             )
 
     # 1번
-    elif page == "학년별 명단":
+    elif page == "tab1":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             col1, col2 = st.columns([3, 1])
@@ -162,7 +212,7 @@ def run_app():
             )
 
     # 2번
-    elif page == "전체 출석부":
+    elif page == "tab2":
         st.markdown(print_banner, unsafe_allow_html=True)
 
         st.markdown("<div class='no-print'>", unsafe_allow_html=True)
@@ -289,7 +339,7 @@ def run_app():
             st.info(f"'{worksheet_name}' 워크시트에 데이터가 없습니다.")
 
     # 3번
-    elif page == "일일 출석부":
+    elif page == "tab3":
         st.markdown(print_banner, unsafe_allow_html=True)
 
         if not df.empty:
@@ -345,8 +395,9 @@ def run_app():
                 try:
                     restored = load_attendance_for_date(date_key)
                     st.session_state["assignments"][date_key] = restored
-                except Exception:
-                    st.session_state["assignments"][date_key] = {}
+                except Exception as e:
+                    st.error(f"출석 데이터를 불러오지 못했습니다: {e}")
+                    st.stop()
 
             day_store = st.session_state["assignments"][date_key]
 
@@ -586,36 +637,63 @@ def run_app():
                 st.session_state[summary_key] = summary_result
 
             if save_clicked:
-                for p in [1, 2, 3]:
-                    df_edited = edited_dfs.get(p)
-                    if df_edited is not None and not df_edited.empty:
-                        for _, row in df_edited.iterrows():
-                            skey = row["_skey"]
-                            v_let = row["배정"]
-                            v_abs = row["결석"]
-                            day_store[(p, skey)] = {
-                                "letter": sanitize_letter(v_let),
-                                "absent": bool(v_abs),
-                            }
+                save_lock_key = f"attendance_save_in_progress_{date_key}"
 
-                summary_result = {}
-                for p in [1, 2, 3]:
-                    df_edited = edited_dfs.get(p)
-                    summary_result[p] = build_period_summary(df_edited)
-                st.session_state[summary_key] = summary_result
+                if st.session_state.get(save_lock_key, False):
+                    st.warning("이미 저장 중입니다. 잠시만 기다려 주세요.")
+                    st.stop()
 
-                st.session_state[teacher_note_key] = {
-                    1: str(note_1).strip(),
-                    2: str(note_2).strip(),
-                    3: str(note_3).strip(),
-                }
+                st.session_state[save_lock_key] = True
 
                 try:
-                    save_attendance_for_date(date_key, day_store)
-                    save_teacher_notes_for_date(date_key, st.session_state[teacher_note_key])
+                    # 1) 현재 화면 상태만 기준으로 새 스냅샷 생성
+                    new_day_store = {}
+
+                    for p in [1, 2, 3]:
+                        df_edited = edited_dfs.get(p)
+                        if df_edited is None or df_edited.empty:
+                            continue
+
+                        for _, row in df_edited.iterrows():
+                            skey = row["_skey"]
+                            letter = sanitize_letter(row["배정"])
+                            absent = bool(row["결석"])
+
+                            new_day_store[(p, skey)] = {
+                                "letter": letter,
+                                "absent": absent,
+                            }
+
+                    # 2) 현재 화면 기준 합계 재계산
+                    summary_result = {}
+                    for p in [1, 2, 3]:
+                        df_edited = edited_dfs.get(p)
+                        summary_result[p] = build_period_summary(df_edited)
+                    st.session_state[summary_key] = summary_result
+
+                    # 3) 교사 메모도 현재 입력값 기준으로 확정
+                    new_teacher_notes = {
+                        1: str(note_1).strip(),
+                        2: str(note_2).strip(),
+                        3: str(note_3).strip(),
+                    }
+
+                    # 4) 세션 상태를 새 스냅샷으로 교체
+                    st.session_state["assignments"][date_key] = new_day_store
+                    day_store = st.session_state["assignments"][date_key]
+                    st.session_state[teacher_note_key] = new_teacher_notes
+
+                    # 5) 저장 실행
+                    save_attendance_for_date(date_key, new_day_store)
+                    save_teacher_notes_for_date(date_key, new_teacher_notes)
+
                     st.toast("💾 저장 완료")
+
                 except Exception as e:
                     st.error(f"🚨 저장 실패: {e}")
+
+                finally:
+                    st.session_state[save_lock_key] = False
 
             st.markdown(
                 """
@@ -658,7 +736,7 @@ def run_app():
             )
 
     # 4번
-    elif page == "학교별 명단":
+    elif page == "tab4":
         st.markdown(print_banner, unsafe_allow_html=True)
         if not df.empty:
             m4 = st.text_input("제목(연/월)", value=now_kst().strftime("%Y.%m"), key="m4")

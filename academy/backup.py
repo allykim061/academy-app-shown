@@ -146,12 +146,21 @@ def save_attendance_for_date(date_key: str, day_store: DayStore) -> None:
         WORKSHEET_ATTENDANCE_DATA,
         ATTENDANCE_DATA_COLUMNS,
     )
-
     batch_id = _new_batch_id(ATTENDANCE_BATCH_PREFIX)
     new_rows = serialize_day_store(date_key, day_store, batch_id)
-
-    if new_rows:
-        ws.append_rows(new_rows, value_input_option="USER_ENTERED")
+    # 완전 빈 상태도 "최신 저장"으로 남기기 위한 특수 행
+    if not new_rows:
+        updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+        new_rows = [[
+            date_key,
+            0,
+            "__EMPTY_BATCH__",
+            "",
+            False,
+            updated_at,
+            batch_id,
+        ]]
+    ws.append_rows(new_rows, value_input_option="USER_ENTERED")
 
 
 def load_attendance_for_date(date_key: str) -> DayStore:
@@ -161,33 +170,26 @@ def load_attendance_for_date(date_key: str) -> DayStore:
         WORKSHEET_ATTENDANCE_DATA,
         ATTENDANCE_DATA_COLUMNS,
     )
-
     records = ws.get_all_records()
     rows = [r for r in records if str(r.get(COL_ATT_DATE, "")).strip() == date_key]
-
     if not rows:
         return {}
-
     df = pd.DataFrame(rows)
-
-    if COL_ATT_UPDATED_AT in df.columns:
-        df[COL_ATT_UPDATED_AT] = df[COL_ATT_UPDATED_AT].astype(str)
-
+    if df.empty:
+        return {}
+    # batch_id가 없으면 예전 방식 fallback
     if COL_ATT_BATCH_ID not in df.columns:
         return deserialize_attendance_rows(rows)
-
-    batch_time = (
-        df.groupby(COL_ATT_BATCH_ID)[COL_ATT_UPDATED_AT]
-        .max()
-        .reset_index()
-        .sort_values(COL_ATT_UPDATED_AT)
+    # 시트에 append된 순서를 보존
+    df["_row_order"] = range(len(df))
+    # 마지막 행의 batch_id를 최신 저장 묶음으로 간주
+    latest_batch_id = str(df.iloc[-1][COL_ATT_BATCH_ID]).strip()
+    latest_rows = (
+        df[df[COL_ATT_BATCH_ID] == latest_batch_id]
+        .sort_values("_row_order")
+        .to_dict("records")
     )
-
-    latest_batch_id = batch_time.iloc[-1][COL_ATT_BATCH_ID]
-    latest_rows = df[df[COL_ATT_BATCH_ID] == latest_batch_id].to_dict("records")
-
     return deserialize_attendance_rows(latest_rows)
-
 
 def save_students_monthly_snapshot(snapshot_month: str, df: pd.DataFrame) -> None:
     sh = _get_spreadsheet()
