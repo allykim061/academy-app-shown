@@ -148,20 +148,10 @@ def save_attendance_for_date(date_key: str, day_store: DayStore) -> None:
     )
     batch_id = _new_batch_id(ATTENDANCE_BATCH_PREFIX)
     new_rows = serialize_day_store(date_key, day_store, batch_id)
-    # 완전 빈 상태도 "최신 저장"으로 남기기 위한 특수 행
+    # 공백만 있는 저장은 기록하지 않음
     if not new_rows:
-        updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
-        new_rows = [[
-            date_key,
-            0,
-            "__EMPTY_BATCH__",
-            "",
-            False,
-            updated_at,
-            batch_id,
-        ]]
+        return
     ws.append_rows(new_rows, value_input_option="USER_ENTERED")
-
 
 def load_attendance_for_date(date_key: str) -> DayStore:
     sh = _get_spreadsheet()
