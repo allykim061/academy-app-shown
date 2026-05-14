@@ -102,6 +102,7 @@ def run_app():
                         or k.startswith("attendance_preview_html_")
                         or k.startswith("attendance_preview_dirty_")
                         or k.startswith("attendance_summary_msg_")
+                        or k.startswith("attendance_status_msg_")
                     ):
                         keys_to_delete.append(k)
                 st.session_state["assignments"] = {}
@@ -391,6 +392,7 @@ def run_app():
 
             if "attendance_date_persist" not in st.session_state:
                 st.session_state["attendance_date_persist"] = today_kst()
+
             d3 = st.date_input(
                 "날짜 선택",
                 value=st.session_state["attendance_date_persist"],
@@ -398,8 +400,10 @@ def run_app():
             )
             selected_date = d3
             st.session_state["attendance_date_persist"] = d3
+
             weekday = WEEKDAY_ORDER[selected_date.weekday()]
             date_key = selected_date.isoformat()
+
             save_lock_key = f"attendance_save_in_progress_{date_key}"
             is_saving = st.session_state.get(save_lock_key, False)
 
@@ -431,9 +435,13 @@ def run_app():
 
             preview_html_key = f"attendance_preview_html_{date_key}"
             preview_dirty_key = f"attendance_preview_dirty_{date_key}"
+            status_msg_key = f"attendance_status_msg_{date_key}"
             summary_msg_key = f"attendance_summary_msg_{date_key}"
+
             if preview_dirty_key not in st.session_state:
                 st.session_state[preview_dirty_key] = True
+            if status_msg_key not in st.session_state:
+                st.session_state[status_msg_key] = ""
             if summary_msg_key not in st.session_state:
                 st.session_state[summary_msg_key] = ""
 
@@ -451,16 +459,21 @@ def run_app():
                 per_period_students[p] = df_p
 
             st.markdown(
-                """
+                f"""
                 <div class="no-print section-nav-row">
-                    <h3>📝 배정 · 결석 입력</h3>
+                    <div>
+                        <h3 style="margin:0;">📝 배정 · 결석 입력</h3>
+                        <div style="font-size:12px; color:#666; margin-top:4px;">
+                            작업 날짜 | {date_key} ({weekday})
+                        </div>
+                    </div>
                     <a href="#t3-preview" class="nav-btn">🖨️ 미리보기</a>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
 
-            st.caption("💡 배정: 알파벳 1글자 입력 · Enter / 방향키 이동")
+            st.caption("💡 배정: 알파벳 1글자 입력 (소문자 가능, 저장 시 대문자 변환) · 입력 후 Enter 또는 다른 칸 클릭 뒤 저장")
 
             summary_clicked = False
             save_clicked = False
@@ -475,8 +488,12 @@ def run_app():
                 absent = int(df_edited["결석"].fillna(False).astype(bool).sum())
 
                 letters = {}
-                for raw in df_edited["배정"].fillna(""):
-                    letter = sanitize_letter(raw)
+                for _, row in df_edited.iterrows():
+                    row_absent = bool(row["결석"])
+                    if row_absent:
+                        continue
+
+                    letter = sanitize_letter(row["배정"])
                     if letter:
                         letters[letter] = letters.get(letter, 0) + 1
 
@@ -487,14 +504,20 @@ def run_app():
                 }
 
             summary_data = st.session_state.get(summary_key, {})
+            status_msg = st.session_state.get(status_msg_key, "")
             summary_msg = st.session_state.get(summary_msg_key, "")
-            status_text = summary_msg or "최근 저장 | —"
+            status_text = status_msg or "최근 저장 | —"
+
             st.markdown("<div class='no-print'>", unsafe_allow_html=True)
             if is_saving:
-                st.info("저장 중... 기다려 주세요")
+                st.info("저장 중입니다. 새로고침하거나 날짜를 바꾸지 말고 잠시 기다려 주세요.")
             else:
                 st.success(status_text)
             st.markdown("</div>", unsafe_allow_html=True)
+
+            if summary_msg:
+                st.caption(summary_msg)
+
             if summary_data:
                 st.markdown(
                     """
@@ -677,46 +700,50 @@ def run_app():
             if save_clicked:
                 if st.session_state.get(save_lock_key, False):
                     st.stop()
+
                 st.session_state[save_lock_key] = True
                 st.session_state[summary_msg_key] = ""
+
                 try:
-                    # 기존 저장본 기준으로 시작
-                    merged_day_store = dict(day_store)
-                    # 현재 화면에서 유효한 입력만 반영
+                    new_day_store = {}
                     for p in [1, 2, 3]:
                         df_edited = edited_dfs.get(p)
                         if df_edited is None or df_edited.empty:
                             continue
+
                         for _, row in df_edited.iterrows():
                             skey = row["_skey"]
                             letter = sanitize_letter(row["배정"])
                             absent = bool(row["결석"])
+
+                            if absent:
+                                letter = ""
+
                             if letter or absent:
-                                merged_day_store[(p, skey)] = {
+                                new_day_store[(p, skey)] = {
                                     "letter": letter,
                                     "absent": absent,
                                 }
-                            # 공백 + 결석 false 는 기존값 유지
-                    # 현재 화면 기준 합계 재계산
+
                     summary_result = {}
                     for p in [1, 2, 3]:
                         df_edited = edited_dfs.get(p)
                         summary_result[p] = build_period_summary(df_edited)
                     st.session_state[summary_key] = summary_result
-                    # 교사 메모 확정
+
                     new_teacher_notes = {
                         1: str(note_1).strip(),
                         2: str(note_2).strip(),
                         3: str(note_3).strip(),
                     }
-                    # 세션 상태 갱신
-                    st.session_state["assignments"][date_key] = merged_day_store
+
+                    st.session_state["assignments"][date_key] = new_day_store
                     day_store = st.session_state["assignments"][date_key]
                     st.session_state[teacher_note_key] = new_teacher_notes
-                    # 저장 실행
-                    save_attendance_for_date(date_key, merged_day_store)
+
+                    save_attendance_for_date(date_key, new_day_store)
                     save_teacher_notes_for_date(date_key, new_teacher_notes)
-                    # 저장 성공 후 미리보기만 갱신
+
                     st.session_state[preview_dirty_key] = True
                     st.session_state[preview_html_key] = generate_table3(
                         df,
@@ -725,10 +752,13 @@ def run_app():
                         day_store,
                         st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
                     )
+
                     saved_time = now_kst().strftime('%H:%M:%S')
                     st.session_state[preview_dirty_key] = False
-                    st.session_state[summary_msg_key] = f"저장 완료 | {date_key} {saved_time}"
+                    st.session_state[status_msg_key] = f"저장 완료 | {date_key} {saved_time}"
+                    st.session_state[summary_msg_key] = ""
                     st.rerun()
+
                 except Exception as e:
                     st.error(f"🚨 저장 실패: {e}")
                 finally:
@@ -757,8 +787,8 @@ def run_app():
                     day_store,
                     st.session_state.get(teacher_note_key, {1: "", 2: "", 3: ""}),
                 )
-
                 st.session_state[preview_dirty_key] = False
+
             preview_html = st.session_state[preview_html_key]
 
             st.markdown(
@@ -777,7 +807,6 @@ def run_app():
                 """,
                 unsafe_allow_html=True
             )
-
     # 4번
     elif page == "tab4":
         st.markdown(print_banner, unsafe_allow_html=True)

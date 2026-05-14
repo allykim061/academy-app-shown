@@ -99,6 +99,11 @@ def serialize_day_store(date_key: str, day_store: DayStore, batch_id: str) -> li
         letter = sanitize_letter(data.get("letter", ""))
         absent = bool(data.get("absent", False))
 
+        # 결석이면 배정은 무시
+        if absent:
+            letter = ""
+
+        # 공백 + 결석 false 는 저장하지 않음
         if not letter and not absent:
             continue
 
@@ -146,12 +151,21 @@ def save_attendance_for_date(date_key: str, day_store: DayStore) -> None:
         WORKSHEET_ATTENDANCE_DATA,
         ATTENDANCE_DATA_COLUMNS,
     )
+
+    if not isinstance(date_key, str) or not date_key.strip():
+        raise ValueError("date_key가 비어 있습니다.")
+    if not isinstance(day_store, dict):
+        raise ValueError("day_store 형식이 올바르지 않습니다.")
+
     batch_id = _new_batch_id(ATTENDANCE_BATCH_PREFIX)
     new_rows = serialize_day_store(date_key, day_store, batch_id)
+
     # 공백만 있는 저장은 기록하지 않음
-    if not new_rows:
+    if len(new_rows) == 0:
         return
+
     ws.append_rows(new_rows, value_input_option="USER_ENTERED")
+
 
 def load_attendance_for_date(date_key: str) -> DayStore:
     sh = _get_spreadsheet()
@@ -162,16 +176,21 @@ def load_attendance_for_date(date_key: str) -> DayStore:
     )
     records = ws.get_all_records()
     rows = [r for r in records if str(r.get(COL_ATT_DATE, "")).strip() == date_key]
+
     if not rows:
         return {}
+
     df = pd.DataFrame(rows)
     if df.empty:
         return {}
+
     # batch_id가 없으면 예전 방식 fallback
     if COL_ATT_BATCH_ID not in df.columns:
         return deserialize_attendance_rows(rows)
+
     # 시트에 append된 순서를 보존
     df["_row_order"] = range(len(df))
+
     # 마지막 행의 batch_id를 최신 저장 묶음으로 간주
     latest_batch_id = str(df.iloc[-1][COL_ATT_BATCH_ID]).strip()
     latest_rows = (
@@ -180,6 +199,7 @@ def load_attendance_for_date(date_key: str) -> DayStore:
         .to_dict("records")
     )
     return deserialize_attendance_rows(latest_rows)
+
 
 def save_students_monthly_snapshot(snapshot_month: str, df: pd.DataFrame) -> None:
     sh = _get_spreadsheet()
@@ -270,6 +290,7 @@ def save_teacher_notes_for_date(date_key: str, teacher_notes: dict[int, str]) ->
     if rows:
         ws.append_rows(rows, value_input_option="USER_ENTERED")
 
+
 def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
     sh = _get_spreadsheet()
     ws = _get_or_create_worksheet(
@@ -286,7 +307,6 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
         return result
 
     df = pd.DataFrame(rows)
-
     if df.empty:
         return result
 
@@ -295,7 +315,7 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
 
     latest_by_period = (
         df.sort_values(COL_TNOTE_UPDATED_AT)
-          .drop_duplicates(subset=[COL_TNOTE_PERIOD], keep="last")
+        .drop_duplicates(subset=[COL_TNOTE_PERIOD], keep="last")
     )
 
     for _, row in latest_by_period.iterrows():
@@ -309,6 +329,7 @@ def load_teacher_notes_for_date(date_key: str) -> dict[int, str]:
 
     return result
 
+
 def save_weekly_period_notes(period_notes: dict[int, str], source: str = "current") -> None:
     sh = _get_spreadsheet()
     ws = _get_or_create_worksheet(
@@ -318,6 +339,7 @@ def save_weekly_period_notes(period_notes: dict[int, str], source: str = "curren
     )
     updated_at = now_kst().strftime("%Y-%m-%d %H:%M:%S")
     source = str(source).strip().lower() or "current"
+
     rows = []
     for period, note in period_notes.items():
         try:
@@ -332,19 +354,24 @@ def save_weekly_period_notes(period_notes: dict[int, str], source: str = "curren
             str(note).strip(),
             updated_at,
         ])
+
     all_values = ws.get_all_values()
     if not all_values:
         ws.append_row(WEEKLY_PERIOD_NOTE_COLUMNS)
         all_values = [WEEKLY_PERIOD_NOTE_COLUMNS]
+
     keep_rows = [all_values[0]]
     existing_keys = {(source, str(int(p))) for p in period_notes.keys()}
+
     for row in all_values[1:]:
         row_source = str(row[0]).strip().lower() if len(row) > 0 else ""
         row_period = str(row[1]).strip() if len(row) > 1 else ""
         if (row_source, row_period) not in existing_keys:
             keep_rows.append(row)
+
     ws.clear()
     ws.update("A1", keep_rows)
+
     if rows:
         start_row = len(keep_rows) + 1
         end_row = start_row + len(rows) - 1
@@ -360,6 +387,7 @@ def load_weekly_period_notes(source: str = "current") -> dict[int, str]:
     )
     records = ws.get_all_records()
     source = str(source).strip().lower() or "current"
+
     result: dict[int, str] = {}
     for row in records:
         row_source = str(row.get(COL_WPN_SOURCE, "")).strip().lower()
@@ -372,4 +400,5 @@ def load_weekly_period_notes(source: str = "current") -> dict[int, str]:
         if period <= 0:
             continue
         result[period] = str(row.get(COL_WPN_NOTE, "")).strip()
+
     return result
