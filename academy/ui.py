@@ -22,6 +22,14 @@ from .backup import (
     save_weekly_period_notes, load_weekly_period_notes,
 )
 
+def get_next_month_yyyy_mm():
+    now = now_kst()
+    year = now.year
+    month = now.month + 1
+    if month == 13:
+        year += 1
+        month = 1
+    return f"{year:04d}-{month:02d}"
 
 def run_app():
     df = load_data()
@@ -78,7 +86,8 @@ def run_app():
             elif page == "tab2":
                 keys_to_delete.extend([
                     "table2_source_label",
-                    "m2",
+                    "m2_current",
+                    "m2_next",
                 ])
 
                 for k in list(st.session_state.keys()):
@@ -220,7 +229,6 @@ def run_app():
 
         st.markdown("<div class='no-print'>", unsafe_allow_html=True)
         src_col1, src_col2 = st.columns([2.2, 3.8], vertical_alignment="bottom")
-
         with src_col1:
             table2_source_label = st.radio(
                 "명단 선택",
@@ -228,13 +236,20 @@ def run_app():
                 horizontal=True,
                 key="table2_source_label",
             )
-
-        with src_col2:
-            m2 = st.text_input("하단 표기", value=now_kst().strftime("%Y-%m"), key="m2")
-
-        st.markdown("</div>", unsafe_allow_html=True)
-
         source_key = "current" if table2_source_label == "현재 명단" else "next"
+        default_m2 = (
+            now_kst().strftime("%Y-%m")
+            if source_key == "current"
+            else get_next_month_yyyy_mm()
+        )
+        m2_key = f"m2_{source_key}"
+        with src_col2:
+            m2 = st.text_input(
+                "하단 표기",
+                value=default_m2,
+                key=m2_key,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
         worksheet_name = WORKSHEET_STUDENTS if source_key == "current" else WORKSHEET_STUDENTS_NEXT
         df_table2 = load_data(worksheet_name)
 
