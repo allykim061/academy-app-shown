@@ -65,6 +65,15 @@ def run_app():
     label_to_page = {label: key for key, label in page_labels.items()}
     page = label_to_page.get(selected_label, "tab0")
 
+    st.markdown(
+    """
+    <div class="no-print" style="font-size:13px; color:#666; margin:8px 0 14px 0;">
+        ※ 본 사이트는 가상 학생 데이터를 활용한 기능 시연용 데모입니다.
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
     with st.sidebar:
         if st.button("새로고침"):
             st.cache_data.clear()

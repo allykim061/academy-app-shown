@@ -8,7 +8,7 @@ from academy.ui import run_app
 def main():
     st.set_page_config(
         page_title=PAGE_TITLE,
-        page_icon="icon.png",
+        page_icon="📚",
         layout="wide",
     )
     run_app()

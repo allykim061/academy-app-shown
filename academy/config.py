@@ -1,6 +1,6 @@
 # academy/config.py
 
-PAGE_TITLE = "학생 인원관리 시스템"
+PAGE_TITLE = "학생 인원관리 시스템 (Demo)"
 
 SCOPE = [
     "https://www.googleapis.com/auth/spreadsheets",
