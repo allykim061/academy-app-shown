@@ -3,6 +3,7 @@
 학생 데이터를 단일 원장에서 관리하고,
 학생 명단, 반편성표, 일일 출석부, 학교별 명단을 자동 생성하며
 출석 및 배정 정보를 저장·복원할 수 있습니다.
+
 ⚠️ 본 저장소는 가상 학생 데이터를 활용한 공개 데모 버전입니다.
 
 ```
@@ -40,40 +41,6 @@ Google Sheets
       ├─ 출석부
       └─ 학교별 명단
 ```
-
-```
-Demo: https://academy-app-shown-j5s336qqguyun3igzkfdkr.streamlit.app/
-```
-
-## 1. 프로젝트 배경
-## Problem
-학원 운영자는 학생 정보가 변경될 때마다
-- 학생 명단
-- 반편성표
-- 일일 출석부
-- 학교별 명단
-을 각각 수정해야 했습니다.
-학생 한 명의 요일이나 교시가 변경되면 여러 문서를 반복 수정해야 했고,
-문서 간 불일치와 인쇄 준비 작업이 빈번하게 발생했습니다.
-
-## Solution
-Google Sheets를 단일 데이터 원장으로 사용하고,
-Streamlit 웹 인터페이스를 통해 필요한 문서를 자동 생성하도록 구성했습니다.
-학생 정보는 한 곳에서만 관리하고,
-모든 출력물은 해당 데이터를 기준으로 자동 생성됩니다.
-
-## 2. 시스템 구조
-`
-Google Sheets
-      │
-      ▼
- Streamlit
-      │
-      ├─ 학생 명단
-      ├─ 반편성표
-      ├─ 출석부
-      └─ 학교별 명단
-`
 
 ## 3. 주요 기능
 ① 전체 학생 목록
@@ -134,7 +101,7 @@ A4 출력 환경에 맞춰 레이아웃을 최적화했습니다.
 <img width="1916" height="646" alt="091839" src="https://github.com/user-attachments/assets/5eb83a41-31a2-4e0a-86ac-1ea01ac0b82d" />
 
 ## 6. 기술 스택
-`
+```
 Frontend
 - Streamlit
 Data
@@ -143,10 +110,10 @@ Data
 - gspread
 Deployment
 - Streamlit Community Cloud
-`
+```
 
 ## 6. 프로젝트 구조
-`
+```
 academy/
  ├ config.py
  ├ data.py
@@ -157,7 +124,7 @@ academy/
  ├ utils.py
  └ ui.py
 app.py
-`
+```
 ## 7. 개선 과정
 ⸻
 
