@@ -6,9 +6,7 @@
 
 ⚠️ 본 저장소는 가상 학생 데이터를 활용한 공개 데모 버전입니다.
 
-```
-Demo: https://academy-app-shown-j5s336qqguyun3igzkfdkr.streamlit.app/
-```
+Demo: <https://academy-app-shown-j5s336qqguyun3igzkfdkr.streamlit.app/>
 
 ## 1. 프로젝트 배경
 ## Problem
@@ -66,6 +64,7 @@ Google Sheets에 저장된 학생 정보를 실시간으로 조회할 수 있습
 현재 명단과 다음달 명단을 분리하여 관리할 수 있습니다.
 
 ④ 일일 출석부
+
 [웹 입력 화면]
 <img width="866" height="402" alt="화면 캡처 2026-06-02 085330" src="https://github.com/user-attachments/assets/d5bebae1-5c21-4184-96e2-4c2555fe0671" />
 [인쇄 결과물]
@@ -167,14 +166,6 @@ KeyError: '학년'
 - 월별 통계
 - 더 많은 인원 관리
 - 문서 양식 커스터마이징 기능 제공
-
-⸻
-
-Future Improvements
-	•	User authentication and role management
-	•	Attendance history storage
-	•	Document customization options
-	•	Performance optimization for larger student datasets
 
 ⸻
 
