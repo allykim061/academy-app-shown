@@ -16,6 +16,7 @@ Demo: https://academy-app-shown-j5s336qqguyun3igzkfdkr.streamlit.app/
 - 반편성표
 - 일일 출석부
 - 학교별 명단
+
 을 각각 수정해야 했습니다.
 학생 한 명의 요일이나 교시가 변경되면 여러 문서를 반복 수정해야 했고,
 문서 간 불일치와 인쇄 준비 작업이 빈번하게 발생했습니다.
