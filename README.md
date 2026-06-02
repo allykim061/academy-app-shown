@@ -101,13 +101,17 @@ A4 출력 환경에 맞춰 레이아웃을 최적화했습니다.
 
 ## 6. 기술 스택
 ```
-Frontend
+### Frontend
 - Streamlit
-Data
+### Data Processing
 - Pandas
-- Google Sheets API
+### Data Storage
+- Google Sheets
 - gspread
-Deployment
+- Google Sheets API
+### Automation
+- Google Apps Script
+### Deployment
 - Streamlit Community Cloud
 ```
 
@@ -160,6 +164,18 @@ KeyError: '학년'
 
 ⸻
 
+5. 학생ID 관리 자동화
+현재월 명단(students)과 다음달 명단(students_next) 간
+학생ID 불일치로 인해 동일 학생이 신규 학생으로 인식되는 문제가 발생했습니다.
+이를 해결하기 위해 Google Apps Script를 활용하여:
+- 학생ID 자동 생성
+- students_next 학생ID 동기화
+- 중복 및 누락 ID 검사
+기능을 구현했습니다.
+이를 통해 명단 비교 정확도를 높이고
+사용자 입력 실수를 줄일 수 있었습니다.
+
+⸻
 ## 8. 향후 개선 사항
 - 사용자 인증
 - 권한 관리
